@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Familjeaktiviteter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/*@@STYLES@@*/
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Familjeaktiviteter</h1>
+    <div class="sub" id="statusLine">Laddar…</div>
+    <div class="kid-chips" id="kidChips"></div>
+  </header>
+  <nav class="tabs" aria-label="Vyer">
+    <a href="#forslag" data-view="forslag">Förslag</a>
+    <a href="#plan" data-view="plan">Dagsplan</a>
+    <a href="#bestall" data-view="bestall">Beställ</a>
+    <a href="#betyg" data-view="betyg">Betyg</a>
+    <a href="#profil" data-view="profil">Familj</a>
+    <a href="#kallor" data-view="kallor">Städer &amp; källor</a>
+  </nav>
+
+  <section class="view" id="view-forslag" aria-label="Förslag"></section>
+  <section class="view" id="view-plan" aria-label="Dagsplan"></section>
+  <section class="view" id="view-bestall" aria-label="Beställ"></section>
+  <section class="view" id="view-betyg" aria-label="Betyg"></section>
+  <section class="view" id="view-profil" aria-label="Familj"></section>
+  <section class="view" id="view-kallor" aria-label="Städer och källor"></section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*@@LOGIC@@*/
+/*@@APP@@*/
+</script>
+</body>
+</html>

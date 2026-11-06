@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # No lockfile yet (see ROADMAP). Switch to `npm ci` once package-lock.json is committed.
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: dist/index.html is up to date
+        run: |
+          npm run build
+          git diff --exit-code -- dist/index.html || (echo "Run npm run build and commit dist/index.html" && exit 1)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: familjeaktiviteter-index-html
+          path: dist/index.html
