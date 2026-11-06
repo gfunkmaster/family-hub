@@ -1,5 +1,16 @@
 # Ändringslogg
 
+## 0.4.0 – 2026-11-06
+
+- Hemsidan påbörjad i `web/`: Next.js (App Router), strikt TypeScript, Prisma 7 och Postgres.
+  - Förslag dag för dag eller som lista, med restid och kostnad från telefonens GPS, en sparad plats eller sökningens egna värden.
+  - Beställ helg, vecka eller månad, med adress eller nuvarande position som utgångspunkt.
+  - Betyg sparas och påverkar rangordningen.
+  - Agentens API (`/api/agent/state`, `runs/[id]`, `requests/[id]`, `import`) med Bearer-token och validering av allt som skrivs.
+  - Inloggning med familjelösenord.
+- Logiken flyttad till arbetsytan `packages/logic` och delas av appen och hemsidan.
+- Dockerfile och `fly.toml` för Fly.io. CI kör migreringar mot Postgres, bygger sidan, kör ett röktest och bygger Docker-avbilden.
+
 ## 0.3.1 – 2026-11-06
 
 Efter första testkörningen av den schemalagda uppgiften (issue #1):

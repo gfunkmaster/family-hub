@@ -2,8 +2,9 @@
 
 En agent och en app som hittar saker att göra med barn: en helg, en vecka eller en hel månad, till exempel under föräldraledighet. Förslagen anpassas efter barnens ålder, var familjen är, hur ni tar er dit och vad det kostar för hela familjen. Allt från gratis till evenemang som kostar.
 
-- **Appen:** en Claude-artifact, [Familjeaktiviteter](https://claude.ai/artifact/TP4M5ckuaMeNDXtWAs8aBW) (privat).
-- **Agenten:** en schemalagd Claude-körning varje torsdag kl 18.48 som söker, verifierar och skriver in förslag i appens databas.
+- **Hemsidan** (`web/`, under uppbyggnad): Next.js i strikt TypeScript med Postgres, på Fly.io. Kan använda telefonens GPS. Se [docs/drift.md](docs/drift.md).
+- **Appen:** en Claude-artifact, [Familjeaktiviteter](https://claude.ai/artifact/TP4M5ckuaMeNDXtWAs8aBW) (privat). Används tills hemsidan har tagit över.
+- **Agenten:** en schemalagd Claude-körning varje torsdag kl 18.48 som söker, verifierar och skriver in förslag. Den kör på Claude-prenumerationen, inte en API-nyckel.
 
 ## Hur det hänger ihop
 
@@ -26,11 +27,16 @@ Appen kan inte själv hämta data från webben (sidor i Claude får inte göra `
 Kräver Node 22.18 eller senare. Inga körtidsberoenden.
 
 ```bash
-npm install        # typescript och eslint (dev)
-npm test           # node:test, logik + bygge
-npm run typecheck  # tsc, strict
-npm run lint       # eslint
-npm run build      # skriver dist/index.html
+npm install            # alla arbetsytor: packages/logic, web
+npm test               # logik och artifact-bygge
+npm run typecheck && npm run lint
+npm run build          # skriver dist/index.html (artifacten)
+
+# Hemsidan (kräver Postgres, se web/.env.example)
+cp web/.env.example web/.env
+npm run db:generate -w @family-hub/web && npm run db:migrate -w @family-hub/web
+npm run web:dev        # http://localhost:3000
+npm run web:test && npm run web:typecheck && npm run web:lint
 ```
 
 ## Publicera en ny version
@@ -45,8 +51,9 @@ Appen är en enda HTML-fil, `dist/index.html`. Den publiceras som en ny version 
 
 | Sökväg | Innehåll |
 | --- | --- |
-| `src/logic.ts` | Ren logik i strikt TypeScript: ålder, kostnad, restid, poäng, dagsplan, perioder och schema |
-| `src/app.js` | Gränssnittet: rendering, händelser, databas, Claude och kalender |
+| `packages/logic` | `@family-hub/logic`: ren logik i strikt TypeScript (ålder, kostnad, restid, poäng, dagsplan, perioder, schema). Delas av appen och hemsidan |
+| `web/` | Hemsidan: Next.js (App Router), Prisma 7 och Postgres, agentens API, röktest |
+| `src/app.js` | Artifactens gränssnitt: rendering, händelser, databas, Claude och kalender |
 | `src/index.html`, `src/styles.css` | Mall och stil |
 | `scripts/build.mjs` | Strippar typer (Nodes inbyggda) och lägger ihop allt till `dist/index.html` |
 | `test/` | Tester för logik och bygge |
@@ -57,5 +64,6 @@ Appen är en enda HTML-fil, `dist/index.html`. Den publiceras som en ny version 
 - [Arkitektur och begränsningar](docs/arkitektur.md)
 - [Datamodell](docs/datamodell.md)
 - [Den schemalagda körningen](docs/schemalagd-korning.md)
+- [Drift av hemsidan på Fly.io och flytten från appen](docs/drift.md)
 - [Det som återstår](ROADMAP.md)
 - [Ändringslogg](CHANGELOG.md)

@@ -1,9 +1,9 @@
 // Flat config without plugins, so the project needs no extra packages.
-// TypeScript (src/logic.ts) is checked by `tsc`; ESLint covers the JavaScript files.
+// TypeScript (packages/logic, web) is checked by `tsc`; this config covers the JavaScript files.
 import { readFileSync } from "node:fs";
 
 // The UI (src/app.js) runs in the same script as the inlined logic, so logic exports are globals there.
-const logicExports = [...readFileSync(new URL("./src/logic.ts", import.meta.url), "utf8")
+const logicExports = [...readFileSync(new URL("./packages/logic/src/index.ts", import.meta.url), "utf8")
   .matchAll(/^export\s+(?:const|function)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
 const ro = (names) => Object.fromEntries(names.map((n) => [n, "readonly"]));
 
@@ -21,7 +21,7 @@ const rules = {
 };
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "**/node_modules/**", "web/**"] },
   {
     files: ["src/app.js"],
     languageOptions: {

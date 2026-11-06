@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as L from "../src/logic.ts";
+import * as L from "../packages/logic/src/index.ts";
 
 const profile = { adults: 2, budgetMax: 400, children: [{ name: "D", birthdate: "2026-02-01" }], naps: [{ from: "09:30", to: "10:30" }, { from: "13:00", to: "14:30" }] };
 const vaxjo = { transport: { car: true, transit: true }, maxTravelMin: 40, carCostPerKm: 2.5, transitTicket: { adult: 40 } };

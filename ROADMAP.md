@@ -27,8 +27,21 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 ## P3: Teknik
 
 14. **Lås beroenden.** Kör `npm install` och committa `package-lock.json` (gick inte i miljön där repot skapades). Byt sedan CI till `npm ci`.
-15. **UI i TypeScript.** Flytta `src/app.js` till strikt TypeScript och dela upp i moduler per vy.
+15. **UI i TypeScript.** Löses av hemsidan, som är TypeScript rakt igenom. Artifactens `src/app.js` tas bort när hemsidan har tagit över.
 16. **E2E-test.** Playwright med mockad Claude-runtime (`window.claude.use`) som renderar Förslag, Dagsplan och Familj med testdata och kollar att det inte blir skriptfel.
 17. **Publicering från CI.** Det finns inget API för att publicera en artifact från GitHub. Tills vidare publicerar Claude `dist/index.html`. Följ upp om det kommer ett API.
 18. **Integritet vid delning.** Adresser och koordinater ligger i den delade databasen. Om appen ska delas: flytta platser till en privat sökväg och se till att körningen fortfarande kan läsa dem.
 19. **Arkitekturbeslut om framtiden.** Om appen ska användas av fler familjer, med inloggning och riktiga API:er, är en egen Next.js-app med NestJS och Prisma ett naturligt nästa steg. Det beslutet bör tas som en ADR, kontrollerad mot befintliga beslut.
+
+## Hemsidan (`web/`)
+
+Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. Kvar för att den ska ersätta appen:
+
+20. **Driftsätt på Fly.io.** Följ [docs/drift.md](docs/drift.md) steg 1–3.
+21. **Flytta data från appen.** Importen i steg 4.
+22. **Byt den schemalagda körningen till sidans API.** Steg 5.
+23. **Familj-sidan.** Barn, sovtider, lediga dagar, budget och sparade platser, med "Spara där jag är nu" via GPS.
+24. **Dagsplan och schema.** Flytta dagsplanen runt sovtider och schemat för vecka och månad från appen.
+25. **Städer och källor.** Redigera transport, restidsgräns och källregister.
+26. **Installera som app.** Webbmanifest och ikon, så att sidan kan läggas på hemskärmen.
+27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.

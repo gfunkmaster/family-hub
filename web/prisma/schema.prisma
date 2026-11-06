@@ -1,0 +1,78 @@
+// Familjeaktiviteter. En familj per installation; tabellerna speglar artifactens databas
+// (se docs/datamodell.md) så att data kan flyttas över rakt av.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Familjeprofilen. Alltid id 1. `data` följer typen Profile i @family-hub/logic.
+model Profile {
+  id        Int      @id @default(1)
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+/// En stad med transport, restidsgräns och källregister. `data` följer typen City.
+model City {
+  id        String   @id
+  name      String
+  data      Json
+  updatedAt DateTime @updatedAt
+  runs      Run[]
+  requests  Request[]
+}
+
+/// En körning: förslag för en period i en stad. `items` är Item[].
+model Run {
+  id        String   @id
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id])
+  from      String
+  to        String
+  kind      String
+  dates     String[]
+  origin    Json?
+  summary   String   @default("")
+  weather   Json
+  items     Json
+  createdAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([cityId, createdAt])
+}
+
+/// En beställning som torsdagskörningen tar hand om.
+model Request {
+  id        String   @id @default(cuid())
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id])
+  from      String
+  to        String
+  kind      String
+  origin    Json?
+  note      String   @default("")
+  status    String   @default("ny")
+  runId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Betyg på ett förslag. Nyckeln är `<stad>--<förslag>` som i artifacten.
+model Rating {
+  key     String   @id
+  cityId  String
+  itemId  String
+  title   String
+  tags    String[]
+  verdict String
+  stars   Int?
+  runId   String?
+  ratedAt DateTime @default(now())
+}
