@@ -30,18 +30,22 @@ En körning för en period.
 
 ```
 { city, from, to, kind, dates: [YYYY-MM-DD…], origin: {name, lat, lng} | null,
-  createdAt, summary, weather: [{date, high, low, precip}], items: [Item] }
+  createdAt, summary, weather: [{date, high, low, precip?, precipMm?}], items: [Item] }
 ```
 
 `Item`: `id, title, kind ("event"|"place"), venue, lat, lng, indoor, durationMin,
 dates [{date, from, to, adult?}], prices {adult, child, childFreeUnder}, travel {walk?, transit?, car?},
 ageFit {level, minMonths, maxMonths, note}, practical {stroller, changing}, note, conflict?, tags, verified, sources [{title, url}]`.
 
+`precip` är risken för nederbörd i procent, `precipMm` mängden i mm. Appen visar det som finns.
+
 Ett återkommande pass (t.ex. babysång varje tisdag) är ett förslag med ett `dates`-element per tillfälle. Dokument får vara högst 256 kB.
 
 ## `requests/<auto-id>`
 
 `{city, from, to, kind ("helg"|"vecka"|"manad"|"egna"), origin {id?, name, address, lat, lng} | null, note, status ("ny"|"klar"), runId?, createdAt}`
+
+Datumen i en beställning räknas som lediga även om `availability` säger annat.
 
 ## `ratings/<stad>--<förslag>`
 
