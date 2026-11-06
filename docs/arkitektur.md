@@ -25,8 +25,20 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 
 ## Rangordning
 
-`scoreItem` i `src/logic.ts`: åldersmatchning (konservativ, sämsta barnet styr), intressen och sådant att undvika, betyg på samma förslag, inlärda taggvikter från alla betyg, budget för hela familjen inklusive resa, restidsgräns per stad och ett litet avdrag när källor säger olika.
+`scoreItem` i `packages/logic`: åldersmatchning (konservativ, sämsta barnet styr), intressen och sådant att undvika, betyg på samma förslag, inlärda taggvikter från alla betyg, budget för hela familjen inklusive resa, restidsgräns per stad och ett litet avdrag när källor säger olika.
 
 ## Schema för vecka och månad
 
 `schedulePeriod` väljer en huvudaktivitet per ledig dag (helger, plus vardagar vid föräldraledighet fram till `leaveUntil`), högst poäng först, aldrig samma förslag två dagar i rad eller med bara en dag emellan, och aldrig något som inte passar åldern.
+
+## Hemsidan
+
+`web/` är en Next.js-sida (App Router) i strikt TypeScript som ska ersätta artifacten. Den har inte artifactens begränsningar:
+
+- **Position:** sidan ber om telefonens GPS när du väljer "Där jag är nu", och restid och kostnad räknas om direkt.
+- **Data:** Postgres via Prisma 7. Tabellerna speglar artifactens databas, så flytten är en import.
+- **Agenten:** den schemalagda körningen fortsätter att vara agenten och kör på Claude-prenumerationen. Den läser och skriver via `/api/agent/*` med en Bearer-token, istället för artifactens databasverktyg. Allt den skickar valideras innan det sparas.
+- **Inloggning:** ett familjelösenord ger en signerad kaka (HMAC) som gäller i 90 dagar. Bara sidorna kräver den. Agentens API har sin egen token.
+- **Drift:** Fly.io med Postgres, region Stockholm (`arn`). Se [drift.md](drift.md).
+
+Logiken ligger i `packages/logic` och används av både artifacten och hemsidan, så rangordning, kostnad och restid räknas likadant.

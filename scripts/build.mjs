@@ -17,7 +17,7 @@ export function build() {
   const template = read("src/index.html");
   const out = template
     .replace("/*@@STYLES@@*/", () => read("src/styles.css").trimEnd())
-    .replace("/*@@LOGIC@@*/", () => buildLogic(read("src/logic.ts")).trimEnd())
+    .replace("/*@@LOGIC@@*/", () => buildLogic(read("packages/logic/src/index.ts")).trimEnd())
     .replace("/*@@APP@@*/", () => read("src/app.js").trimEnd());
   if (/\/\*@@[A-Z]+@@\*\//.test(out)) throw new Error("Unreplaced placeholder in template");
   mkdirSync(new URL("dist/", root), { recursive: true });

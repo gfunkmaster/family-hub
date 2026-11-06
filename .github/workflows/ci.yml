@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  check:
+  artifact:
+    name: Logik och artifact
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,3 +27,54 @@ jobs:
         with:
           name: familjeaktiviteter-index-html
           path: dist/index.html
+
+  web:
+    name: Hemsidan
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: familyhub
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/familyhub
+      FAMILY_PASSWORD: ci-losenord-123
+      SESSION_SECRET: ci-session-secret-0123456789abcdef0123456789
+      AGENT_TOKEN: ci-agent-token-0123456789abcdef0123456789abcd
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run db:generate -w @family-hub/web
+      - name: Migration matches the Prisma schema
+        working-directory: web
+        run: |
+          npm run -s db:sql > /tmp/expected.sql
+          norm() { grep -v '^--' "$1" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]\+/ /g'; }
+          diff <(norm /tmp/expected.sql) <(norm prisma/migrations/0001_init/migration.sql) || {
+            echo "prisma/migrations does not match schema.prisma. Expected SQL:"; cat /tmp/expected.sql; exit 1; }
+      - run: npm run db:migrate -w @family-hub/web
+      - run: npm run typecheck -w @family-hub/web
+      - run: npm run lint -w @family-hub/web
+      - run: npm test -w @family-hub/web
+      - run: npm run build -w @family-hub/web
+      - name: Smoke test against the running site
+        working-directory: web
+        run: |
+          npx next start -p 3000 > /tmp/next.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/api/health && break; sleep 1; done
+          BASE_URL=http://localhost:3000 node scripts/smoke.ts || (cat /tmp/next.log; exit 1)
+
+  docker:
+    name: Docker-bygge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t family-hub .

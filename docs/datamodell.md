@@ -1,6 +1,6 @@
 # Datamodell
 
-Appens databas (artifact `db`). Sökvägar med jämnt antal segment är dokument. Typerna finns i `src/logic.ts`.
+Appens databas (artifact `db`). Sökvägar med jämnt antal segment är dokument. Typerna finns i `packages/logic/src/index.ts`. Hemsidan har samma innehåll i Postgres, se `web/prisma/schema.prisma`: JSON-dokumenten blir tabellerna Profile, City, Run, Request och Rating.
 
 Regler: alla inloggade som appen delas med kan läsa, och bara ägaren skriver (`{path: "", read: "view", write: "owner"}`). Delar du appen kan mottagaren alltså se adresserna i `app/profile`.
 

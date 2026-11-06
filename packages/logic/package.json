@@ -1,0 +1,10 @@
+{
+  "name": "@family-hub/logic",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Ren logik för Familjeaktiviteter: ålder, kostnad, restid, poäng, dagsplan och schema. Används av både artifacten och hemsidan.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
