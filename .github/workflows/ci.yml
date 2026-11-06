@@ -57,7 +57,8 @@ jobs:
         working-directory: web
         run: |
           npm run -s db:sql > /tmp/expected.sql
-          norm() { grep -v '^--' "$1" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]\+/ /g'; }
+          # migrate diff --from-empty also emits CREATE SCHEMA for public, which migrate dev leaves out.
+          norm() { grep -v '^--' "$1" | grep -v '^CREATE SCHEMA IF NOT EXISTS "public";' | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]\+/ /g'; }
           diff <(norm /tmp/expected.sql) <(norm prisma/migrations/0001_init/migration.sql) || {
             echo "prisma/migrations does not match schema.prisma. Expected SQL:"; cat /tmp/expected.sql; exit 1; }
       - run: npm run db:migrate -w @family-hub/web
