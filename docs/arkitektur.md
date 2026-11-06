@@ -41,4 +41,20 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 - **Inloggning:** ett familjelösenord ger en signerad kaka (HMAC) som gäller i 90 dagar. Bara sidorna kräver den. Agentens API har sin egen token.
 - **Drift:** Fly.io med Postgres, region Stockholm (`arn`). Se [drift.md](drift.md).
 
+### Direktsökning
+
+"Sök nu" under Beställ låter sidan söka själv via Claude API (Messages API med verktygen `web_search` och `web_fetch`), utan att vänta på torsdagen. Beställningen sparas först, och sökningen körs efter svaret med `after()` från Next. Sidan laddar om var 10:e sekund tills den är klar.
+
+- **Var:** där du är (GPS), en adress eller ort, eller en sparad stad, med en radie i minuter som räknas om till km (`radiusKmForMinutes`).
+- **Mat:** svaret innehåller matställen nära förslagen och matlådor för barnens ålder. Matlådorna måste ha en källa på livsmedelsverket.se, annars avvisas svaret.
+- **Kontroll:** svaret går genom samma `parseRun` som torsdagskörningen. Perioden, staden och platsen tas från beställningen, inte från modellen.
+- **Budget:** varje sökning sparar sin förbrukning i `AgentUsage`. En ny sökning startar bara om månadens kostnad plus `AGENT_MAX_RUN_USD` ryms i `AGENT_MONTHLY_BUDGET_USD`. Annars hamnar beställningen i kön.
+- **Leverantör:** `web/src/lib/agent/types.ts` beskriver en leverantör (`LlmProvider`). Claude är den enda nu; en annan (t.ex. DeepSeek) blir en ny fil med samma gränssnitt, men behöver egen webbsökning.
+
+Torsdagskörningen tar bara beställningar i kön (`mode: "kö"`).
+
+### Dagsplan med mat
+
+`/plan?run=…&date=…&item=…` lägger valda förslag runt sovtiderna (`autoPlan`) med restid från körningens utgångspunkt eller GPS. Varje måltid har två val: ta med (matlådor för det yngsta barnet och en packlista) eller köpa (de närmaste matställena till aktiviteten, med barnstol, mikro, skötrum och pris).
+
 Logiken ligger i `packages/logic` och används av både artifacten och hemsidan, så rangordning, kostnad och restid räknas likadant.

@@ -1,7 +1,8 @@
 import "server-only";
-import type { City, Item, Origin, Profile } from "@family-hub/logic";
+import { type City, type FoodSpot, type Item, type Origin, type PackedFood, type Profile } from "@family-hub/logic";
 import { db } from "@/lib/db";
-import type { RunView, StoredRating, Weather } from "@/lib/suggest";
+import { runKey, type PlaceView, type RunView, type StoredRating, type Weather } from "@/lib/suggest";
+import type { Run } from "@/generated/prisma/client";
 
 // JSON-kolumnerna valideras när de skrivs (lib/validate.ts) och kan därför läsas som sina typer.
 
@@ -15,21 +16,40 @@ export async function getCities(): Promise<(City & { id: string; name: string })
   return rows.map((r) => ({ ...(r.data as City), id: r.id, name: r.name }));
 }
 
+function toRunView(r: Run, cityNames: Map<string, string>): RunView {
+  const place = (r.place as PlaceView | null) ?? null;
+  const key = runKey(r.cityId, place, r.id);
+  return {
+    id: r.id, city: key, cityId: r.cityId, label: (r.cityId ? cityNames.get(r.cityId) : undefined) ?? place?.name ?? key, place,
+    from: r.from, to: r.to, kind: r.kind, dates: r.dates,
+    summary: r.summary, createdAt: r.createdAt.toISOString(),
+    weather: r.weather as unknown as Weather[], items: r.items as unknown as Item[],
+    food: (r.food as unknown as FoodSpot[] | null) ?? [], packed: (r.packed as unknown as PackedFood[] | null) ?? [],
+    origin: (r.origin as Origin | null) ?? null,
+  };
+}
+
+async function cityNames(): Promise<Map<string, string>> {
+  return new Map((await db().city.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
+}
+
+/** Senaste körningen per stad eller plats. */
 export async function getLatestRunPerCity(): Promise<RunView[]> {
-  const rows = await db().run.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  const [rows, names] = await Promise.all([db().run.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), cityNames()]);
   const seen = new Set<string>();
   const out: RunView[] = [];
   for (const r of rows) {
-    if (seen.has(r.cityId)) continue;
-    seen.add(r.cityId);
-    out.push({
-      id: r.id, city: r.cityId, from: r.from, to: r.to, kind: r.kind, dates: r.dates,
-      summary: r.summary, createdAt: r.createdAt.toISOString(),
-      weather: r.weather as unknown as Weather[], items: r.items as unknown as Item[],
-      origin: (r.origin as Origin | null) ?? null,
-    });
+    const v = toRunView(r, names);
+    if (seen.has(v.city)) continue;
+    seen.add(v.city);
+    out.push(v);
   }
   return out;
+}
+
+export async function getRun(id: string): Promise<RunView | null> {
+  const [r, names] = await Promise.all([db().run.findUnique({ where: { id } }), cityNames()]);
+  return r ? toRunView(r, names) : null;
 }
 
 export async function getRatings(): Promise<StoredRating[]> {

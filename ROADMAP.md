@@ -41,7 +41,9 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 21. **Flytta data från appen.** Importen i steg 4.
 22. **Byt den schemalagda körningen till sidans API.** Steg 5.
 23. **Familj-sidan.** Barn, sovtider, lediga dagar, budget och sparade platser, med "Spara där jag är nu" via GPS.
-24. **Dagsplan och schema.** Flytta dagsplanen runt sovtider och schemat för vecka och månad från appen.
+24. **Schema för vecka och månad.** Dagsplanen med mat finns (`/plan`). Kvar: schemat för vecka och månad, och att välja flera förslag till samma dag.
 25. **Städer och källor.** Redigera transport, restidsgräns och källregister.
 26. **Installera som app.** Webbmanifest och ikon, så att sidan kan läggas på hemskärmen.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.
+28. **Fler leverantörer för direktsökning.** DeepSeek eller liknande via `LlmProvider`. Kräver en egen sökmotor (t.ex. Brave Search API), eftersom de saknar inbyggd webbsökning.
+29. **Geokodning på servern.** En adress eller ort utan koordinater får nu sina koordinater av agenten. En geokodare på servern ger restid redan innan sökningen.

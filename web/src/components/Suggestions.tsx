@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { fmtPrecip, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Origin, type Profile, type Tier } from "@family-hub/logic";
 import { rate } from "@/app/actions";
-import { rankedSuggestions, suggestionsByDay, type Filters, type RunView, type StoredRating, type Suggestion } from "@/lib/suggest";
+import Link from "next/link";
+import { cityFor, rankedSuggestions, suggestionsByDay, type Filters, type RunView, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
 
 type CityRow = City & { id: string; name: string };
@@ -21,7 +22,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
   const geo = useGeolocation();
 
   const run = runs.find((r) => r.city === cityId) ?? runs[0];
-  const city: CityRow = cities.find((c) => c.id === run?.city) ?? { id: run?.city ?? "", name: run?.city ?? "" };
+  const city: CityRow = run ? cityFor(run, cities) : { id: "", name: "" };
   const places = (profile.places ?? []).filter(hasCoords);
 
   const origin: Origin | null = useMemo(() => {
@@ -42,12 +43,12 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
     <section className="view on" aria-label="Förslag">
       {runs.length > 1 ? (
         <div className="row">{runs.map((r) => (
-          <button key={r.id} className="small" aria-pressed={r.city === run.city} onClick={() => setCityId(r.city)}>{cities.find((c) => c.id === r.city)?.name ?? r.city}</button>
+          <button key={r.id} className="small" aria-pressed={r.city === run.city} onClick={() => setCityId(r.city)}>{r.label}</button>
         ))}</div>
       ) : null}
 
       <div className="card">
-        <h2>{city.name} · {longRun ? `${dayName(run.dates[0] ?? run.from)} – ${dayName(run.dates[run.dates.length - 1] ?? run.to)}` : run.dates.map(dayName).join(" – ")}</h2>
+        <h2>{run.label} · {longRun ? `${dayName(run.dates[0] ?? run.from)} – ${dayName(run.dates[run.dates.length - 1] ?? run.to)}` : run.dates.map(dayName).join(" – ")}</h2>
         {run.summary ? <p className="note">{run.summary}</p> : null}
         {!longRun && run.weather.length ? (
           <div className="weather">{run.weather.map((w) => (
@@ -96,16 +97,16 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         ? days.map((d) => (
           <div key={d.date} className="card">
             <div className="row between"><h3>{dayName(d.date)}</h3>{d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}</div>
-            {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
+            {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
             {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
           </div>
         ))
-        : list.length ? list.map((s) => <Card key={s.item.id} s={s} runId={run.id} />) : <div className="card empty">Inget matchar filtret.</div>}
+        : list.length ? list.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} />) : <div className="card empty">Inget matchar filtret.</div>}
     </section>
   );
 }
 
-function Card({ s, runId, compact = false }: { s: Suggestion; runId: string; compact?: boolean }) {
+function Card({ s, runId, date, compact = false }: { s: Suggestion; runId: string; date: string; compact?: boolean }) {
   const [pending, start] = useTransition();
   const { item: it, cost, fit, travel, tier } = s;
   const vote = (verdict: "bra" | "nej" | "besokt") => start(() => rate({ key: s.key, runId, itemId: it.id, verdict }));
@@ -139,6 +140,7 @@ function Card({ s, runId, compact = false }: { s: Suggestion; runId: string; com
         <button className="small" disabled={pending} aria-pressed={s.verdict === "bra"} onClick={() => vote("bra")}>Bra förslag</button>
         <button className="small" disabled={pending} aria-pressed={s.verdict === "nej"} onClick={() => vote("nej")}>Inte för oss</button>
         <button className="small" disabled={pending} aria-pressed={s.verdict === "besokt"} onClick={() => vote("besokt")}>Vi var där</button>
+        <Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link>
       </div>
     </article>
   );

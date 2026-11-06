@@ -177,3 +177,34 @@ test("nederbörd visas med rätt enhet", () => {
   assert.equal(L.fmtPrecip({ date: "2026-11-15", precip: null }), "");
   assert.equal(L.svNum(-0.3), "-0,3");
 });
+
+test("mat nära aktiviteten och matlådor efter ålder", () => {
+  const blubb = { id: "blubb", lat: 59.3328, lng: 18.118 };
+  const food = [
+    { id: "far", title: "Långt bort", lat: 59.40, lng: 18.0 },
+    { id: "cafe", title: "Café vid museet", lat: 59.3330, lng: 18.1175, near: ["blubb"], highChair: "ja", microwave: "ja" },
+    { id: "nopos", title: "Saknar position", near: ["blubb"] },
+    { id: "other", title: "Utan koppling eller position" },
+  ];
+  const near = L.nearestFood(food, blubb, 3);
+  assert.deepEqual(near.map((f) => f.id), ["cafe", "far", "nopos"]);
+  assert.equal(near[0].distanceKm, 0);
+  assert.equal(near[2].distanceKm, null);
+  const packed = [
+    { id: "puré", title: "Rotfruktspuré", fromMonths: 6, toMonths: 12, ingredients: ["Morot", "Potatis"], steps: ["Koka"], sources: [{ url: "https://www.livsmedelsverket.se/" }] },
+    { id: "pasta", title: "Pastasallad", fromMonths: 12, ingredients: ["Pasta", "morot"], steps: ["Koka"], sources: [{ url: "https://www.livsmedelsverket.se/" }] },
+  ];
+  assert.deepEqual(L.packedFor(packed, 9).map((p) => p.id), ["puré"]);
+  assert.deepEqual(L.packedFor(packed, 14).map((p) => p.id), ["pasta"]);
+  assert.deepEqual(L.packingList(packed), ["Morot", "Potatis", "Pasta"]);
+  assert.equal(L.radiusKmForMinutes(30), 13);
+});
+
+test("dagsplanen får lunch även när en aktivitet täcker lunchtiden", () => {
+  const items = [{ id: "a", title: "Lång utflykt", dates: [{ date: "2026-11-10", from: "10:30", to: "16:00" }], durationMin: 150 }];
+  const plan = L.autoPlan(items, { naps: [] }, "2026-11-10");
+  const lunch = plan.find(b => b.kind === "mat");
+  assert.ok(lunch, JSON.stringify(plan));
+  assert.equal(lunch.time, "13:00");
+  for (const b of plan) if (b !== lunch && b.kind !== "info") assert.ok(L.toMin(lunch.time) >= L.toMin(b.endTime) || L.toMin(lunch.endTime) <= L.toMin(b.time), "lunch overlaps " + b.title);
+});
