@@ -17,14 +17,16 @@ const MESSAGES: Record<number, string> = {
 /** Telefonens position, bara när användaren trycker på knappen. */
 export function useGeolocation() {
   const [state, setState] = useState<GeoState>({ status: "idle" });
-  const request = useCallback(() => {
-    if (!("geolocation" in navigator)) { setState({ status: "error", message: "Webbläsaren kan inte ge position." }); return; }
+  /** Ber om positionen. Löftet ger samma resultat som `state`, för den som vill agera på svaret. */
+  const request = useCallback((): Promise<GeoState> => new Promise((resolve) => {
+    const done = (s: GeoState) => { setState(s); resolve(s); };
+    if (!("geolocation" in navigator)) { done({ status: "error", message: "Webbläsaren kan inte ge position." }); return; }
     setState({ status: "loading" });
     navigator.geolocation.getCurrentPosition(
-      (p) => setState({ status: "ok", lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
-      (e) => setState({ status: "error", message: MESSAGES[e.code] ?? "Positionen gick inte att få fram." }),
+      (p) => done({ status: "ok", lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      (e) => done({ status: "error", message: MESSAGES[e.code] ?? "Positionen gick inte att få fram." }),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
-  }, []);
+  }), []);
   return { state, request };
 }

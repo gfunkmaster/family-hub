@@ -1,5 +1,10 @@
 # Ändringslogg
 
+## 0.6.0 – 2026-11-06
+
+- Familj-sidan på hemsidan: barn, sovtider, lediga dagar och föräldraledighet, vad torsdagskörningen tar fram, budget, behov, intressen, hemstad och platser. "Spara där jag är nu" sparar telefonens position som en plats.
+- Profilen kontrolleras och rensas på servern (samma kontroll vid import): rimliga tal, giltiga tider och koordinater, inga okända fält.
+
 ## 0.5.0 – 2026-11-06
 
 - Sök var som helst: där du är (GPS), en adress eller ort, eller en sparad stad, med en radie i minuter. En enskild dag går också att beställa.

@@ -9,7 +9,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, verifySessionToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { isValidId } from "@/lib/validate";
+import { isValidId, parseProfile } from "@/lib/validate";
 import { runDirectSearch } from "@/lib/agent/runner";
 import { runKey } from "@/lib/suggest";
 
@@ -98,4 +98,15 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   if (mode === "direkt") after(() => runDirectSearch(req.id));
   revalidatePath("/bestall");
   return { ok: true, direct: mode === "direkt" };
+}
+
+/** Sparar familjens profil från Familj-sidan. Samma kontroll som importen. */
+export async function saveProfile(input: unknown): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  await requireFamily();
+  const parsed = parseProfile(input);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  const data = parsed.value as Prisma.InputJsonValue;
+  await db().profile.upsert({ where: { id: 1 }, create: { id: 1, data }, update: { data } });
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

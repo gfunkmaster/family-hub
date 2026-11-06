@@ -20,6 +20,8 @@ Regler: alla inloggade som appen delas med kan läsa, och bara ägaren skriver (
 | `autoRun` | `"helg" \| "vecka" \| "ingen"` | Vad torsdagskörningen tar fram utan beställning |
 | `places` | `{id, name, address, city, lat?, lng?, geoNote?}[]` | Utgångspunkter för restid |
 
+På hemsidan skrivs profilen från Familj-sidan (`/familj`). Den går genom `parseProfile`, som tar bort okända fält och kräver giltiga tider (`to` efter `from`) och koordinater (både `lat` och `lng`, eller ingen).
+
 ## `cities/<id>`
 
 `name`, `origin` (text), `defaultPlaceId`, `transport {car, transit}`, `maxTravelMin`, `carCostPerKm`, `transitTicket {adult, child, note}`, `childFreeTransitUnder` (år), `sources [{name, url, kind}]` (källregistret).
