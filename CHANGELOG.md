@@ -1,5 +1,9 @@
 # Ändringslogg
 
+## Ej släppt
+
+- `scripts/lokalt.sh` kör hemsidan lokalt på Macen, med import av data från appen.
+
 ## 0.4.0 – 2026-11-06
 
 - Hemsidan påbörjad i `web/`: Next.js (App Router), strikt TypeScript, Prisma 7 och Postgres.
