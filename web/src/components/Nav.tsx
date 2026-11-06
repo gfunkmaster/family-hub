@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
 
-export function Nav({ current }: { current: "forslag" | "bestall" }) {
+export function Nav({ current }: { current: "forslag" | "bestall" | "plan" }) {
   return (
     <>
       <header className="top">

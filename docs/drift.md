@@ -22,6 +22,14 @@ fly secrets set FAMILY_PASSWORD='välj-ett-lösenord' \
 
 Spara `AGENT_TOKEN` någonstans säkert. Den schemalagda körningen behöver den.
 
+Direktsökning (valfritt). Nyckeln skapas på platform.claude.com. Sätt ett eget utgiftstak där också, som extra skydd:
+
+```bash
+fly secrets set ANTHROPIC_API_KEY='sk-ant-…' AGENT_MONTHLY_BUDGET_USD=10 AGENT_MAX_RUN_USD=1
+```
+
+`AGENT_MODEL` är `claude-sonnet-5-5` om den inte sätts. Utan nyckel är "Sök nu" avstängd och allt går via kön.
+
 ## 3. Driftsätt
 
 ```bash

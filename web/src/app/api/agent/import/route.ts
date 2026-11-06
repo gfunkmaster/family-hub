@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { badRequest, readJson, rejectUnlessAgent } from "@/lib/agent-api";
+import { runData, requestData } from "@/lib/persist";
 import { isValidId, parseCity, parseProfile, parseRating, parseRequest, parseRun } from "@/lib/validate";
 
 type Obj = Record<string, unknown>;
@@ -29,8 +30,8 @@ export async function POST(req: Request) {
   ratings.forEach((x) => { if (!x.ok) errors.push(...x.errors); });
   const existing = await db().city.findMany({ select: { id: true } });
   const cityIds = new Set([...cities.map((c) => c.id), ...existing.map((c) => c.id)]);
-  runs.forEach((x) => { if (x.r.ok && !cityIds.has(x.r.value.city)) errors.push(`runs.${x.id}: staden ${x.r.value.city} finns inte`); });
-  requests.forEach((x, i) => { if (x.ok && !cityIds.has(x.value.city)) errors.push(`requests[${i}]: staden ${x.value.city} finns inte`); });
+  runs.forEach((x) => { if (x.r.ok && x.r.value.city && !cityIds.has(x.r.value.city)) errors.push(`runs.${x.id}: staden ${x.r.value.city} finns inte`); });
+  requests.forEach((x, i) => { if (x.ok && x.value.city && !cityIds.has(x.value.city)) errors.push(`requests[${i}]: staden ${x.value.city} finns inte`); });
   if (errors.length) return badRequest(errors);
 
   await db().$transaction(async (tx) => {
@@ -40,13 +41,12 @@ export async function POST(req: Request) {
       await tx.city.upsert({ where: { id: c.id }, create: { id: c.id, name, data: rest as Prisma.InputJsonValue }, update: { name, data: rest as Prisma.InputJsonValue } });
     }
     for (const x of runs) if (x.r.ok) {
-      const v = x.r.value;
-      const data = { cityId: v.city, from: v.from, to: v.to, kind: v.kind, dates: v.dates, origin: v.origin ? (v.origin as Prisma.InputJsonValue) : Prisma.DbNull, summary: v.summary, createdAt: new Date(v.createdAt), weather: v.weather as Prisma.InputJsonValue, items: v.items as unknown as Prisma.InputJsonValue };
+      const data = runData(x.r.value);
       await tx.run.upsert({ where: { id: x.id }, create: { id: x.id, ...data }, update: data });
     }
     for (const x of requests) if (x.ok) {
-      const { id, origin, createdAt, city, ...rest } = x.value;
-      const data = { ...rest, cityId: city, origin: origin ? (origin as Prisma.InputJsonValue) : Prisma.DbNull, createdAt: new Date(createdAt) };
+      const id = x.value.id;
+      const data = requestData(x.value);
       if (id) await tx.request.upsert({ where: { id }, create: { id, ...data }, update: data });
       else await tx.request.create({ data });
     }

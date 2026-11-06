@@ -354,8 +354,10 @@ export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts
   }
   for (const n of naps) if (!n.used && n.from >= cur && n.to <= end) takeNap(n);
   if (!lunchDone && lunchAt >= dayStart) {
-    const busy = blocks.some((b) => b.kind !== "info" && lunchAt < b.end && lunchAt + 45 > b.start);
-    if (!busy) blocks.push({ start: lunchAt, end: lunchAt + 45, kind: "mat", title: "Lunch", note: "" });
+    // Upptaget vid lunchtid: lunch direkt efter det som pågår, så att dagen alltid har en måltid.
+    let at = lunchAt;
+    for (let moved = true; moved;) { moved = false; for (const b of blocks) if (b.kind !== "info" && at < b.end && at + 45 > b.start) { at = b.end; moved = true; } }
+    if (at + 45 <= end) blocks.push({ start: at, end: at + 45, kind: "mat", title: "Lunch", note: at > lunchAt + 60 ? "Sen lunch, ta med mellanmål" : "" });
   }
   return blocks.sort((a, b) => a.start - b.start || a.end - b.end).map((b) => ({ ...b, time: fmtMin(b.start), endTime: fmtMin(b.end) }));
 }
@@ -416,4 +418,67 @@ export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item
     if (pick) lastUsed[pick.it.id] = i;
     return { date: d, pick: pick ? pick.it : null, alts: ok.slice(1, 3).map((c) => c.it) };
   });
+}
+
+// ---------- Mat ----------
+
+/** Ett ställe att äta eller köpa mat nära en eller flera aktiviteter. */
+export interface FoodSpot {
+  id: string;
+  title: string;
+  venue?: string;
+  lat?: number;
+  lng?: number;
+  near?: string[];
+  highChair?: YesNo;
+  microwave?: YesNo;
+  changing?: YesNo;
+  priceNote?: string;
+  hoursNote?: string;
+  note?: string;
+  sources?: { title?: string; url: string }[];
+}
+
+/** Ett förslag på mat att ta med hemifrån. Åldersråden ska gå att spåra till Livsmedelsverket. */
+export interface PackedFood {
+  id: string;
+  title: string;
+  fromMonths: number;
+  toMonths?: number | null;
+  ingredients: string[];
+  steps: string[];
+  keeps?: string;
+  note?: string;
+  sources: { title?: string; url: string }[];
+}
+
+/** Matställen sorterade efter avstånd från en punkt; de som pekar ut aktiviteten (near) först vid lika avstånd. */
+export function nearestFood(food: FoodSpot[], point: Partial<Coords> & { id?: string }, limit = 3): (FoodSpot & { distanceKm: number | null })[] {
+  return food
+    .map((f) => ({ ...f, distanceKm: hasCoords(f) && hasCoords(point) ? Math.round(haversineKm(point, f) * 10) / 10 : null }))
+    .filter((f) => f.distanceKm != null || (point.id != null && (f.near ?? []).includes(point.id)))
+    .sort((a, b) => {
+      const da = a.distanceKm ?? 999, db = b.distanceKm ?? 999;
+      if (da !== db) return da - db;
+      const na = point.id && (a.near ?? []).includes(point.id) ? 0 : 1, nb = point.id && (b.near ?? []).includes(point.id) ? 0 : 1;
+      return na - nb;
+    })
+    .slice(0, limit);
+}
+
+/** Matlådeförslag som passar barnets ålder i månader. */
+export function packedFor(packed: PackedFood[], months: number): PackedFood[] {
+  return packed.filter((p) => months >= p.fromMonths && (p.toMonths == null || months <= p.toMonths));
+}
+
+/** Samlad packlista: unika ingredienser från valda förslag, i ursprunglig ordning. */
+export function packingList(chosen: PackedFood[]): string[] {
+  const seen = new Set<string>(), out: string[] = [];
+  for (const p of chosen) for (const i of p.ingredients) { const k = i.trim().toLowerCase(); if (k && !seen.has(k)) { seen.add(k); out.push(i.trim()); } }
+  return out;
+}
+
+/** Ungefärlig radie i km för en restid i minuter (bil i stadstrafik, 35 km/h, fågelvägen = väg / 1,3). */
+export function radiusKmForMinutes(minutes: number): number {
+  return Math.max(1, Math.round(((minutes / 60) * 35) / 1.3));
 }

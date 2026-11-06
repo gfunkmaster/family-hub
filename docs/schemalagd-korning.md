@@ -7,6 +7,8 @@
 
 Texten nedan är källan. Ändras den här: be Claude uppdatera den schemalagda uppgiften med samma text.
 
+Körningen skriver fortfarande till artifactens databas. Hemsidans direktsökning (`web/src/lib/agent/prompt.ts`) har egna instruktioner med plats, radie och mat. När körningen flyttas till sidans API (drift.md steg 5) ska den ta beställningar med `mode: "kö"` och kan skicka `place`, `food` och `packed` enligt [datamodell.md](datamodell.md).
+
 ---
 
 ```text

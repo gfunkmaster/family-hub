@@ -4,7 +4,8 @@ En agent och en app som hittar saker att göra med barn: en helg, en vecka eller
 
 - **Hemsidan** (`web/`, under uppbyggnad): Next.js i strikt TypeScript med Postgres, på Fly.io. Kan använda telefonens GPS. Se [docs/drift.md](docs/drift.md).
 - **Appen:** en Claude-artifact, [Familjeaktiviteter](https://claude.ai/artifact/TP4M5ckuaMeNDXtWAs8aBW) (privat). Används tills hemsidan har tagit över.
-- **Agenten:** en schemalagd Claude-körning varje torsdag kl 18.48 som söker, verifierar och skriver in förslag. Den kör på Claude-prenumerationen, inte en API-nyckel.
+- **Agenten:** en schemalagd Claude-körning varje torsdag kl 18.48 som söker, verifierar och skriver in förslag. Den kör på Claude-prenumerationen.
+- **Sök nu** (hemsidan, valfritt): samma sökning direkt via Claude API, med ett månadstak. Kräver `ANTHROPIC_API_KEY`, se [docs/drift.md](docs/drift.md).
 
 ## Hur det hänger ihop
 
