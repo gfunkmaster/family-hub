@@ -19,10 +19,17 @@ if [ -f "$ENV_FILE" ] && grep -q '^DATABASE_URL=.' "$ENV_FILE"; then
   DATABASE_URL="$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)"
   say "Använder DATABASE_URL från $ENV_FILE"
 elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  say "Startar Postgres i Docker (behållaren fh-pg, port 5432)"
-  docker start fh-pg >/dev/null 2>&1 || docker run -d --name fh-pg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=familyhub -p 5432:5432 postgres:17 >/dev/null
+  # Egen port, så att den inte krockar med en Postgres som redan kör på 5432.
+  PG_PORT="${FH_PG_PORT:-54329}"
+  say "Startar Postgres i Docker (behållaren fh-pg, port $PG_PORT)"
+  if docker container inspect fh-pg >/dev/null 2>&1 && \
+     ! docker container inspect fh-pg --format '{{json .HostConfig.PortBindings}}' | grep -q "\"$PG_PORT\""; then
+    docker rm -f fh-pg >/dev/null   # gammal behållare med annan port (eller en som aldrig kunde starta)
+  fi
+  docker start fh-pg >/dev/null 2>&1 || docker run -d --name fh-pg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=familyhub -p "$PG_PORT:5432" postgres:17 >/dev/null
   for _ in $(seq 1 30); do docker exec fh-pg pg_isready -U postgres -q && break; sleep 1; done
-  DATABASE_URL="postgresql://postgres:dev@localhost:5432/familyhub"
+  docker exec fh-pg pg_isready -U postgres -q || fail "Postgres i Docker startade inte. Se: docker logs fh-pg"
+  DATABASE_URL="postgresql://postgres:dev@localhost:$PG_PORT/familyhub"
 elif command -v pg_isready >/dev/null 2>&1 && pg_isready -q; then
   say "Använder Postgres som redan körs på Macen"
   createdb familyhub 2>/dev/null || true
