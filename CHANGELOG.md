@@ -1,5 +1,12 @@
 # Ändringslogg
 
+## 0.3.1 – 2026-11-06
+
+Efter första testkörningen av den schemalagda uppgiften (issue #1):
+
+- Vädret kan anges som risk i procent (`precip`) eller mängd i mm (`precipMm`), och appen visar rätt enhet. Körningen skrev mm i `precip`.
+- Datumen i en beställning räknas som lediga även om profilen säger annat. En helgbeställning blev kvar som "ny" när helger var avmarkerade.
+
 ## 0.3.0 – 2026-11-06
 
 - Repo med bygge (`npm run build` → `dist/index.html`), tester, typecheck, lint och CI.

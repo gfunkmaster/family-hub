@@ -72,11 +72,11 @@ function renderForslag(){
   const dayCards=view==="dag"?days.map(d=>{
     const list=(run.items||[]).filter(it=>dayEntry(it,d)).map(it=>evalAt(it,d)).filter(pass).sort((a,b)=>b.score-a.score);
     const w=(run.weather||[]).find(x=>x.date===d);
-    return `<div class="card"><div class="row between"><h3>${esc(dayName(d))}</h3>${w?`<span class="wx">${esc(Number(w.high).toLocaleString("sv-SE"))}°, ${esc(w.precip)} %</span>`:""}</div>
+    return `<div class="card"><div class="row between"><h3>${esc(dayName(d))}</h3>${w?`<span class="wx">${esc(svNum(Number(w.high)))}°${fmtPrecip(w)?", "+esc(fmtPrecip(w)):""}</span>`:""}</div>
       ${list.length?list.slice(0,3).map(x=>dayRow(x,run,d)).join(""):`<div class="meta">Inget som passar den här dagen.</div>`}
       ${list.length>3?`<div class="meta">${list.length-3} förslag till under Alla förslag.</div>`:""}</div>`;
   }).join(""):"";
-  const wx=(run.weather||[]).map(w=>`<span class="wx">${esc(dayName(w.date))}: ${esc(Number(w.high).toLocaleString("sv-SE"))}° / ${esc(Number(w.low).toLocaleString("sv-SE"))}°, ${esc(w.precip)} % risk för nederbörd</span>`).join("");
+  const wx=(run.weather||[]).map(w=>`<span class="wx">${esc(dayName(w.date))}: ${esc(svNum(Number(w.high)))}° / ${esc(svNum(Number(w.low)))}°${fmtPrecip(w,true)?", "+esc(fmtPrecip(w,true)):""}</span>`).join("");
   el.innerHTML=`
     <div class="row">${ids.map(id=>`<button class="small" data-act="city" data-id="${esc(id)}" aria-pressed="${id===S.ui.city}">${esc(cityById(id).name||id)}</button>`).join("")}</div>
     <div class="card">

@@ -109,6 +109,16 @@ export function isoDate(dt: Date): string { return dt.getFullYear() + "-" + Stri
 export function addDays(iso: string, n: number): string { const d = parseDate(iso); d.setDate(d.getDate() + n); return isoDate(d); }
 export function datesBetween(from: string, to: string): string[] { const out: string[] = []; let d = from, g = 0; while (d <= to && g++ < 62) { out.push(d); d = addDays(d, 1); } return out; }
 export function isWeekend(iso: string): boolean { const g = parseDate(iso).getDay(); return g === 0 || g === 6; }
+/** Svensk decimalform utan locale-beroende: 3.3 → "3,3". */
+export function svNum(n: number): string { return String(Math.round(n * 10) / 10).replace(".", ","); }
+export interface Weather { date: string; high?: number | null; low?: number | null; precip?: number | null; precipMm?: number | null }
+/** Nederbörd som text: risk i procent (`precip`) eller mängd i mm (`precipMm`). Tom sträng när inget är känt. */
+export function fmtPrecip(w: Weather | null | undefined, long = false): string {
+  if (!w) return "";
+  if (w.precipMm != null) return svNum(w.precipMm) + " mm" + (long ? " nederbörd" : "");
+  if (w.precip != null) return svNum(w.precip) + " %" + (long ? " risk för nederbörd" : "");
+  return "";
+}
 export function isoWeek(iso: string): number {
   const d = parseDate(iso); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const w1 = new Date(d.getFullYear(), 0, 4);

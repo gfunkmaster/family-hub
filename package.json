@@ -1,6 +1,6 @@
 {
   "name": "familjeaktiviteter",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Agent och app som hittar aktiviteter för barnfamiljer: helg, vecka eller månad, efter barnens ålder, restid och budget.",
   "type": "module",

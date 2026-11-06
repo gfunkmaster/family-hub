@@ -168,3 +168,12 @@ test("bara http(s)-länkar släpps igenom", () => {
   assert.equal(L.safeUrl("javascript:alert(1)"), null);
   assert.equal(L.safeUrl("https://husebybruk.se"), "https://husebybruk.se/");
 });
+
+test("nederbörd visas med rätt enhet", () => {
+  assert.equal(L.fmtPrecip({ date: "2026-11-12", precip: 10 }), "10 %");
+  assert.equal(L.fmtPrecip({ date: "2026-11-12", precip: 10 }, true), "10 % risk för nederbörd");
+  assert.equal(L.fmtPrecip({ date: "2026-11-12", precipMm: 3.3 }), "3,3 mm");
+  assert.equal(L.fmtPrecip({ date: "2026-11-12", precipMm: 0, precip: 40 }), "0 mm", "mm wins when both are given");
+  assert.equal(L.fmtPrecip({ date: "2026-11-15", precip: null }), "");
+  assert.equal(L.svNum(-0.3), "-0,3");
+});

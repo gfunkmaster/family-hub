@@ -23,7 +23,8 @@ Ta fram aktiviteter för en barnfamilj för en helg, en vecka eller en månad oc
 - runs: tidigare körningar, för att undvika upprepningar.
 
 2. VAD SOM SKA KÖRAS
-- En körning för varje request med status "ny".
+- En körning för varje request med status "ny". Behandla alla. Hinner du inte: skriv i rapporten vilka som återstår.
+- Datumen i en request räknas som lediga även om availability säger annat, eftersom familjen själv har valt dem.
 - Finns ingen och autoRun är "helg": kommande lördag–söndag. "vecka": nästa måndag–söndag. "ingen": gör ingenting och avsluta med en rad om det.
 - Stad: homeCity, om inte Google Kalender (list_events för perioden) visar att familjen är i en annan stad som finns i cities. Skriv i summary vilken stad du valde och varför.
 - Lediga dagar: helger om availability.weekends inte är false, vardagar bara om availability.weekdays är true och dagen är senast leaveUntil. Leta aktiviteter för de lediga dagarna, men run.dates ska innehålla hela perioden.
@@ -35,7 +36,7 @@ I ordning: requestens origin; annars places-posten som cities/<id>.defaultPlaceI
 - Börja med källregistret: hämta varje källa med WebFetch och leta efter aktiviteter för periodens lediga dagar som passar barnens ålder (räkna månader från födelsedatum per datum).
 - Vardagar som föräldraledig: prioritera återkommande aktiviteter som öppen förskola, babysång och sagostund på biblioteket, kyrkans babycafé, babysim, bebisbio och museernas småbarnsvisningar. Ett återkommande pass (t.ex. babysång varje tisdag) blir ETT förslag med ett dates-element per tillfälle i perioden.
 - Komplettera med WebSearch. Helg: 6–12 förslag. Vecka: 10–20. Månad: 15–35. Blanda gratis, under 300 kr och dyrare. Ta med några platser som fungerar alla dagar (lekplats, natur, bad, museum) med öppettider per datum.
-- Vädret: prognos för de första 7–10 dagarna. Längre fram: inget väder.
+- Vädret: prognos för de första 7–10 dagarna. precip är risken för nederbörd i procent (0–100). Ger prognosen bara mängd: använd precipMm (mm) i stället. Längre fram: inget väder.
 - Hämta aldrig sajter som tools nekar. Gå inte runt en nekad sajt.
 
 5. VERIFIERA OCH BEDÖM
@@ -48,7 +49,7 @@ I ordning: requestens origin; annars places-posten som cities/<id>.defaultPlaceI
 
 6. SKRIV
 - runs/<cityId>-<from> (set). Finns dokumentet: läs versionen först. Håll dokumentet under 200 kB (korta noter vid månadskörningar). Format:
-{city, from, to, kind, dates:[alla datum från from till to], origin:{name, lat, lng} eller null, createdAt: ISO-tid nu, summary: 1–3 meningar, weather:[{date, high, low, precip}], items:[{id (kort slug), title, kind "event"|"place", venue, lat, lng, indoor true|false, durationMin, dates:[{date, from "HH:MM", to "HH:MM", adult?}], prices:{adult, child, childFreeUnder}, travel:{walk?, transit?, car?}, ageFit:{level, minMonths, maxMonths, note}, practical:{stroller "ja"|"nej"|"oklart", changing "ja"|"nej"|"oklart"}, note, conflict?, tags:[…], verified, sources:[{title, url}]}]}
+{city, from, to, kind, dates:[alla datum från from till to], origin:{name, lat, lng} eller null, createdAt: ISO-tid nu, summary: 1–3 meningar, weather:[{date, high, low, precip?, precipMm?}], items:[{id (kort slug), title, kind "event"|"place", venue, lat, lng, indoor true|false, durationMin, dates:[{date, from "HH:MM", to "HH:MM", adult?}], prices:{adult, child, childFreeUnder}, travel:{walk?, transit?, car?}, ageFit:{level, minMonths, maxMonths, note}, practical:{stroller "ja"|"nej"|"oklart", changing "ja"|"nej"|"oklart"}, note, conflict?, tags:[…], verified, sources:[{title, url}]}]}
 - Sätt varje behandlad request till status "klar" och runId.
 - Hittade du en pålitlig kalender som saknas i källregistret: lägg till högst 3 nya i cities/<id>.sources ({name, url, kind}).
 - Ändra aldrig app/profile eller ratings.
