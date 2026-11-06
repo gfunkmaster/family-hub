@@ -180,14 +180,102 @@ export function parseRequestPatch(body: unknown): Result<{ status: RequestStatus
   return { ok: true, value: { status: body.status as RequestStatus, runId: (body.runId as string | null | undefined) ?? null } };
 }
 
+const AUTO_RUN = ["helg", "vecka", "ingen"] as const;
+const validTime = (v: unknown): v is string => isStr(v) && HHMM.test(v) && Number(v.split(":")[0]) < 24 && Number(v.split(":")[1]) < 60;
+const minutesOf = (t: string) => Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]);
+const optBool = (v: unknown) => v === undefined || typeof v === "boolean";
+
+function tagList(v: unknown, at: string, errors: string[]): string[] {
+  if (v === undefined) return [];
+  if (!(Array.isArray(v) && v.every(isStr))) { errors.push(`${at} måste vara en lista med text`); return []; }
+  const out: string[] = [];
+  for (const t of v) { const x = t.trim().toLowerCase().slice(0, 40); if (x && !out.includes(x)) out.push(x); }
+  if (out.length > 30) errors.push(`${at} får ha högst 30 ord`);
+  return out;
+}
+
+/**
+ * Familjens profil, från Familj-sidan eller importen. Allt kontrolleras och okända fält tas bort,
+ * eftersom profilen styr både rangordningen och agentens instruktioner.
+ */
 export function parseProfile(body: unknown): Result<Profile> {
   if (!isObj(body)) return { ok: false, errors: ["profile är inget objekt"] };
   const errors: string[] = [];
-  if (body.children !== undefined && !(Array.isArray(body.children) && body.children.every((c) => isObj(c) && isIsoDate(c.birthdate)))) errors.push("children[].birthdate måste vara YYYY-MM-DD");
-  if (body.naps !== undefined && !(Array.isArray(body.naps) && body.naps.every((n) => isObj(n) && isStr(n.from) && HHMM.test(n.from) && isStr(n.to) && HHMM.test(n.to)))) errors.push("naps[] måste ha from och to som HH:MM");
-  if (!optNum(body.adults) || !optNum(body.budgetMax)) errors.push("adults och budgetMax måste vara tal");
+  const b = body;
+  if (b.adults !== undefined && !(isNum(b.adults) && Number.isInteger(b.adults) && b.adults >= 1 && b.adults <= 6)) errors.push("adults måste vara 1–6");
+  if (!optNum(b.budgetMax) || (isNum(b.budgetMax) && (b.budgetMax < 0 || b.budgetMax > 100000))) errors.push("budgetMax måste vara 0–100 000 kr eller tomt");
+
+  const children: NonNullable<Profile["children"]> = [];
+  if (b.children !== undefined) {
+    if (!Array.isArray(b.children) || b.children.length > 8) errors.push("children måste vara en lista med högst 8 barn");
+    else b.children.forEach((c, i) => {
+      if (!isObj(c) || !isIsoDate(c.birthdate)) { errors.push(`children[${i}].birthdate måste vara YYYY-MM-DD`); return; }
+      if (c.name !== undefined && !isStr(c.name)) errors.push(`children[${i}].name måste vara text`);
+      if (c.id !== undefined && !(isStr(c.id) && ID.test(c.id))) errors.push(`children[${i}].id har otillåtna tecken`);
+      if (!optBool(c.approx)) errors.push(`children[${i}].approx måste vara sant eller falskt`);
+      children.push({
+        ...(isStr(c.id) ? { id: c.id } : {}),
+        ...(isStr(c.name) && c.name.trim() ? { name: c.name.trim().slice(0, 40) } : {}),
+        birthdate: c.birthdate, ...(c.approx === true ? { approx: true } : {}),
+      });
+    });
+  }
+
+  const naps: NonNullable<Profile["naps"]> = [];
+  if (b.naps !== undefined) {
+    if (!Array.isArray(b.naps) || b.naps.length > 4) errors.push("naps måste vara en lista med högst 4 sovtider");
+    else b.naps.forEach((n, i) => {
+      if (!isObj(n) || !validTime(n.from) || !validTime(n.to)) { errors.push(`naps[${i}] måste ha from och to som HH:MM`); return; }
+      if (minutesOf(n.to) <= minutesOf(n.from)) { errors.push(`naps[${i}]: to måste vara efter from`); return; }
+      naps.push({ from: n.from, to: n.to });
+    });
+    naps.sort((x, y) => minutesOf(x.from) - minutesOf(y.from));
+  }
+
+  const places: NonNullable<Profile["places"]> = [];
+  if (b.places !== undefined) {
+    if (!Array.isArray(b.places) || b.places.length > 20) errors.push("places måste vara en lista med högst 20 platser");
+    else b.places.forEach((p, i) => {
+      const at = `places[${i}]`;
+      if (!isObj(p) || !isStr(p.id) || !ID.test(p.id)) { errors.push(`${at}.id saknas eller har otillåtna tecken`); return; }
+      const name = isStr(p.name) ? p.name.trim().slice(0, 60) : "", address = isStr(p.address) ? p.address.trim().slice(0, 120) : "";
+      if (!name && !address) errors.push(`${at} behöver ett namn eller en adress`);
+      if (p.city !== undefined && p.city !== "" && !(isStr(p.city) && ID.test(p.city))) errors.push(`${at}.city har otillåtna tecken`);
+      const hasLat = p.lat !== undefined && p.lat !== null, hasLng = p.lng !== undefined && p.lng !== null;
+      if (hasLat !== hasLng) errors.push(`${at} måste ha både lat och lng, eller ingen`);
+      else if (hasLat && !(isNum(p.lat) && isNum(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180)) errors.push(`${at}.lat/lng är inga giltiga koordinater`);
+      places.push({
+        id: p.id, ...(name ? { name } : {}), ...(address ? { address } : {}),
+        ...(isStr(p.city) && p.city ? { city: p.city } : {}),
+        ...(hasLat && isNum(p.lat) && isNum(p.lng) ? { lat: p.lat, lng: p.lng } : {}),
+        ...(isStr(p.geoNote) && p.geoNote ? { geoNote: p.geoNote.slice(0, 120) } : {}),
+      });
+    });
+    if (new Set(places.map((p) => p.id)).size !== places.length) errors.push("places har dubbla id");
+  }
+
+  if (b.needs !== undefined && !(isObj(b.needs) && optBool(b.needs.stroller) && optBool(b.needs.changing))) errors.push("needs måste vara {stroller, changing} som sant eller falskt");
+  if (b.availability !== undefined && !(isObj(b.availability) && optBool(b.availability.weekdays) && optBool(b.availability.weekends))) errors.push("availability måste vara {weekdays, weekends} som sant eller falskt");
+  if (b.homeCity !== undefined && b.homeCity !== "" && !(isStr(b.homeCity) && ID.test(b.homeCity))) errors.push("homeCity har otillåtna tecken");
+  if (b.leaveUntil !== undefined && b.leaveUntil !== null && b.leaveUntil !== "" && !isIsoDate(b.leaveUntil)) errors.push("leaveUntil måste vara YYYY-MM-DD eller tomt");
+  if (b.autoRun !== undefined && !oneOf(AUTO_RUN, b.autoRun)) errors.push(`autoRun måste vara ${AUTO_RUN.join(", ")}`);
+  const interests = tagList(b.interests, "interests", errors), avoid = tagList(b.avoid, "avoid", errors);
   if (errors.length) return { ok: false, errors };
-  return { ok: true, value: body as Profile };
+
+  const needs = isObj(b.needs) ? b.needs : {}, avail = isObj(b.availability) ? b.availability : {};
+  return {
+    ok: true,
+    value: {
+      adults: isNum(b.adults) ? b.adults : 2,
+      budgetMax: isNum(b.budgetMax) ? b.budgetMax : null,
+      children, naps, places, interests, avoid,
+      needs: { stroller: needs.stroller === true, changing: needs.changing === true },
+      availability: { weekdays: avail.weekdays === true, weekends: avail.weekends !== false },
+      leaveUntil: isIsoDate(b.leaveUntil) ? b.leaveUntil : null,
+      autoRun: oneOf(AUTO_RUN, b.autoRun) ? b.autoRun : "helg",
+      ...(isStr(b.homeCity) && b.homeCity ? { homeCity: b.homeCity } : {}),
+    },
+  };
 }
 
 export function parseCity(id: string, body: unknown): Result<City & { name: string }> {
