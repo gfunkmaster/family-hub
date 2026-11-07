@@ -63,6 +63,10 @@ Varje anrop har rubriken `Authorization: Bearer <AGENT_TOKEN>`. Körningen anrop
 
 ## Lokalt
 
+Enklast: `./scripts/lokalt.sh` från repots rot. Skriptet hittar Postgres (Docker eller en Postgres som redan körs), skapar `web/.env` med slumpade hemligheter, installerar, migrerar, startar sidan på http://localhost:3000 och importerar `web/.data/import.json` en gång om filen finns.
+
+Manuellt:
+
 ```bash
 docker run -d --name fh-pg -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=familyhub -p 5432:5432 postgres:17
 cp web/.env.example web/.env       # fyll i SESSION_SECRET och AGENT_TOKEN
