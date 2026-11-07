@@ -1,18 +1,8 @@
 # Ändringslogg
 
-## 0.6.0 – 2026-11-06
+## Ej släppt
 
-- Familj-sidan på hemsidan: barn, sovtider, lediga dagar och föräldraledighet, vad torsdagskörningen tar fram, budget, behov, intressen, hemstad och platser. "Spara där jag är nu" sparar telefonens position som en plats.
-- Profilen kontrolleras och rensas på servern (samma kontroll vid import): rimliga tal, giltiga tider och koordinater, inga okända fält.
-
-## 0.5.0 – 2026-11-06
-
-- Sök var som helst: där du är (GPS), en adress eller ort, eller en sparad stad, med en radie i minuter. En enskild dag går också att beställa.
-- "Sök nu": sidan söker själv via Claude API med webbsökning, med ett månadstak i USD. Förbrukningen sparas per sökning. Utan API-nyckel, eller när taket är nått, hamnar beställningen i kön till torsdagen.
-- Beställningar visar Väntar, Söker, Klar eller Fel med orsak. Klar länkar till förslagen.
-- Dagsplan (`/plan`) från "Planera dagen": restid från körningen eller GPS, sovtider och för varje måltid ta med (matlådor för barnets ålder med källa hos Livsmedelsverket, och packlista) eller köpa nära aktiviteten (barnstol, mikro, skötrum, pris).
-- Dagsplanen får alltid lunch, direkt efter en aktivitet som täcker lunchtiden.
-- Datamodell: `place`, `food`, `packed`, `mode`, `error` och tabellen `AgentUsage` (migrering `0002_plats_mat_budget`). CI jämför migreringarna mot schemat med en skuggdatabas.
+- `scripts/lokalt.sh` kör hemsidan lokalt på Macen, med import av data från appen.
 
 ## 0.4.0 – 2026-11-06
 
