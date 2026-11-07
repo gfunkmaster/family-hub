@@ -12,7 +12,8 @@ export async function GET(req: Request) {
   const [profile, cities, requests, ratings, runs] = await Promise.all([
     prisma.profile.findUnique({ where: { id: 1 } }),
     prisma.city.findMany(),
-    prisma.request.findMany({ where: { status: "ny" }, orderBy: { createdAt: "asc" } }),
+    // Direktsökningar sköts av sidan själv; körningen tar bara kön.
+    prisma.request.findMany({ where: { status: "ny", mode: "kö" }, orderBy: { createdAt: "asc" } }),
     prisma.rating.findMany(),
     prisma.run.findMany({ orderBy: { createdAt: "desc" }, take: 20, select: { id: true, cityId: true, from: true, to: true, kind: true, createdAt: true, items: true } }),
   ]);

@@ -27,11 +27,13 @@ model City {
   requests  Request[]
 }
 
-/// En körning: förslag för en period i en stad. `items` är Item[].
+/// En körning: förslag för en period i en stad eller runt en plats. `items` är Item[],
+/// `food` är FoodSpot[] (mat nära aktiviteterna) och `packed` PackedFood[] (matlådor).
 model Run {
   id        String   @id
-  cityId    String
-  city      City     @relation(fields: [cityId], references: [id])
+  cityId    String?
+  city      City?    @relation(fields: [cityId], references: [id])
+  place     Json?
   from      String
   to        String
   kind      String
@@ -40,17 +42,24 @@ model Run {
   summary   String   @default("")
   weather   Json
   items     Json
+  food      Json     @default("[]")
+  packed    Json     @default("[]")
   createdAt DateTime
   updatedAt DateTime @updatedAt
 
   @@index([cityId, createdAt])
 }
 
-/// En beställning som torsdagskörningen tar hand om.
+/// En beställning. `mode` är "direkt" (sidan söker via Claude API) eller "kö" (torsdagskörningen).
+/// Antingen en sparad stad eller en plats ({name, address?, lat?, lng?}) med radie.
 model Request {
   id        String   @id @default(cuid())
-  cityId    String
-  city      City     @relation(fields: [cityId], references: [id])
+  cityId    String?
+  city      City?    @relation(fields: [cityId], references: [id])
+  place     Json?
+  radiusKm  Int?
+  mode      String   @default("kö")
+  error     String?
   from      String
   to        String
   kind      String
@@ -75,4 +84,21 @@ model Rating {
   stars   Int?
   runId   String?
   ratedAt DateTime @default(now())
+}
+
+/// Kostnad för varje direktsökning, för budgettaket.
+model AgentUsage {
+  id               String   @id @default(cuid())
+  requestId        String?
+  model            String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  webSearches      Int      @default(0)
+  webFetches       Int      @default(0)
+  costUsd          Float
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
 }

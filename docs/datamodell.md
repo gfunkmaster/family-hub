@@ -56,6 +56,16 @@ Datumen i en beställning räknas som lediga även om `availability` säger anna
 Dagsplan: `{runId, city, date, blocks [{time, endTime, kind, title, note}], source ("auto"|"claude"), createdAt}`.
 Schema: `{kind: "schema", runId, city, date, days [{date, itemId, title, time}], createdAt}`.
 
+## Bara på hemsidan
+
+Hemsidans tabeller har några fält till, som artifacten saknar:
+
+- **Run:** `cityId` kan vara null när sökningen gjordes runt en plats. Då finns `place {name, address?, lat?, lng?, radiusKm?}`. Förslag och betyg grupperas på staden, annars på `plats-<slug av platsens namn>`.
+  - `food [FoodSpot]`: matställen nära förslagen. `{id, title, venue?, lat?, lng?, near [item-id], highChair, microwave, changing ("ja"|"nej"|"oklart"), priceNote?, hoursNote?, note?, sources [{title, url}]}`. Minst en källa.
+  - `packed [PackedFood]`: matlådor att ta med. `{id, title, fromMonths, toMonths?, ingredients [text], steps [text], keeps?, note?, sources}`. Minst en källa ska ligga på livsmedelsverket.se.
+- **Request:** `cityId` eller `place`, `radiusKm`, `mode` (`"direkt"` sidan söker själv, `"kö"` torsdagskörningen), `status` (`"ny"|"pågår"|"klar"|"fel"`) och `error` (varför den inte gick).
+- **AgentUsage:** en rad per direktsökning: `requestId, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, webSearches, webFetches, costUsd, createdAt`. Månadens summa styr budgettaket.
+
 ## I webbläsaren
 
 `localStorage["fh-origin"]`: vald utgångspunkt per stad, bara för den som tittar.

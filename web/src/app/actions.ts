@@ -3,11 +3,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { radiusKmForMinutes } from "@family-hub/logic";
 import { Prisma } from "@/generated/prisma/client";
 import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, verifySessionToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { isValidId } from "@/lib/validate";
+import { runDirectSearch } from "@/lib/agent/runner";
+import { runKey } from "@/lib/suggest";
 
 async function requireFamily(): Promise<void> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -45,26 +49,53 @@ export async function rate(input: { key: string; runId: string; itemId: string; 
     await prisma.rating.delete({ where: { key: input.key } });
   } else {
     const stars = input.verdict === "besokt" ? (input.stars ?? prev?.stars ?? null) : null;
-    const data = { cityId: run.cityId, itemId: item.id, title: item.title, tags: item.tags ?? [], verdict: input.verdict, stars, runId: run.id, ratedAt: new Date() };
+    const data = { cityId: runKey(run.cityId, run.place as { name?: string } | null, run.id), itemId: item.id, title: item.title, tags: item.tags ?? [], verdict: input.verdict, stars, runId: run.id, ratedAt: new Date() };
     await prisma.rating.upsert({ where: { key: input.key }, create: { key: input.key, ...data }, update: data });
   }
   revalidatePath("/");
 }
 
-export async function createRequest(_prev: { error?: string; ok?: boolean } | null, form: FormData): Promise<{ error?: string; ok?: boolean }> {
+export type RequestState = { error?: string; ok?: boolean; direct?: boolean } | null;
+
+/** Sparar en beställning. "Sök nu" startar direktsökningen efter svaret, så sidan inte väntar på den. */
+export async function createRequest(_prev: RequestState, form: FormData): Promise<RequestState> {
   await requireFamily();
+  const where = String(form.get("where") ?? "stad");
   const city = String(form.get("city") ?? "");
-  const [from = "", to = ""] = String(form.get("period") ?? "").split("|");
-  const kind = String(form.get("kind") ?? "egna");
-  const address = String(form.get("address") ?? "").trim();
+  const kind = String(form.get("kind") ?? "helg");
+  const day = String(form.get("day") ?? "");
+  const [from = "", to = ""] = kind === "dag" ? [day, day] : String(form.get("period") ?? "").split("|");
+  const placeName = String(form.get("placeName") ?? "").trim().slice(0, 120);
   const lat = Number(form.get("lat")), lng = Number(form.get("lng"));
+  const hasGps = form.get("lat") !== "" && form.get("lat") !== null && Number.isFinite(lat) && Number.isFinite(lng);
+  const minutes = Number(form.get("minutes"));
   const note = String(form.get("note") ?? "").trim().slice(0, 500);
-  if (!isValidId(city) || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return { error: "Välj stad och period." };
-  if (!["helg", "vecka", "manad", "egna"].includes(kind)) return { error: "Okänd period." };
-  const origin = Number.isFinite(lat) && Number.isFinite(lng) && form.get("lat")
-    ? { name: address || "Här nu", address, lat, lng }
-    : address ? { name: address, address } : null;
-  await db().request.create({ data: { cityId: city, from, to, kind, note, origin: origin ?? Prisma.DbNull } });
+  const mode = form.get("mode") === "direkt" ? "direkt" : "kö";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return { error: "Välj en period." };
+  if (!["helg", "vecka", "manad", "dag"].includes(kind)) return { error: "Okänd period." };
+  if (![15, 30, 45, 60, 90].includes(minutes)) return { error: "Välj hur långt ni vill åka." };
+  const radiusKm = radiusKmForMinutes(minutes);
+
+  let cityId: string | null = null;
+  let place: { name: string; address?: string; lat?: number; lng?: number } | null = null;
+  let origin: { name: string; address?: string; lat?: number; lng?: number } | null = null;
+  if (where === "gps") {
+    if (!hasGps) return { error: "Tryck på Använd där jag är nu först." };
+    place = { name: placeName || "Där vi är", lat, lng };
+    origin = { name: place.name, lat, lng };
+  } else if (where === "plats") {
+    if (!placeName) return { error: "Skriv en adress eller ort." };
+    place = { name: placeName, address: placeName };
+    origin = { name: placeName, address: placeName };
+  } else {
+    if (!isValidId(city)) return { error: "Välj stad." };
+    cityId = city;
+  }
+
+  const req = await db().request.create({
+    data: { cityId, place: place ? (place as Prisma.InputJsonValue) : Prisma.DbNull, radiusKm, mode, from, to, kind: kind === "dag" ? "egna" : kind, note, origin: origin ? (origin as Prisma.InputJsonValue) : Prisma.DbNull },
+  });
+  if (mode === "direkt") after(() => runDirectSearch(req.id));
   revalidatePath("/bestall");
-  return { ok: true };
+  return { ok: true, direct: mode === "direkt" };
 }
