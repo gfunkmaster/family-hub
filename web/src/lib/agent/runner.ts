@@ -20,9 +20,26 @@ export function providerFromEnv(): LlmProvider | null {
 
 export function directSearchConfigured(): boolean { return !!process.env.ANTHROPIC_API_KEY; }
 
-export async function getBudget(now = new Date()): Promise<BudgetState> {
-  const agg = await db().agentUsage.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: monthStartStockholm(now) } } });
-  return budgetState(agg._sum.costUsd ?? 0, num(process.env.AGENT_MONTHLY_BUDGET_USD, 10), num(process.env.AGENT_MAX_RUN_USD, 1));
+/** En sökning som är äldre än så anses avbruten (maskinen stoppades eller startades om mitt i). */
+export const STALE_AFTER_MIN = 20;
+
+/** Sätter sökningar som fastnat på "pågår" till "fel", så att de inte väntar för evigt och inte reserverar budget. */
+export async function reapStaleRequests(now = new Date()): Promise<number> {
+  const r = await db().request.updateMany({
+    where: { status: "pågår", updatedAt: { lt: new Date(now.getTime() - STALE_AFTER_MIN * 60_000) } },
+    data: { status: "fel", error: "Sökningen avbröts, troligen för att servern startades om. Beställ igen." },
+  });
+  return r.count;
+}
+
+/** `excludeRequestId`: den sökning som frågar, så att den inte reserverar budget åt sig själv. */
+export async function getBudget(now = new Date(), excludeRequestId?: string): Promise<BudgetState> {
+  const prisma = db();
+  const [agg, inFlight] = await Promise.all([
+    prisma.agentUsage.aggregate({ _sum: { costUsd: true }, where: { createdAt: { gte: monthStartStockholm(now) } } }),
+    prisma.request.count({ where: { status: "pågår", mode: "direkt", ...(excludeRequestId ? { NOT: { id: excludeRequestId } } : {}) } }),
+  ]);
+  return budgetState(agg._sum.costUsd ?? 0, num(process.env.AGENT_MONTHLY_BUDGET_USD, 10), num(process.env.AGENT_MAX_RUN_USD, 1), inFlight);
 }
 
 async function recordUsage(requestId: string, usage: LlmUsage, model: string): Promise<void> {
@@ -45,12 +62,17 @@ export async function runDirectSearch(requestId: string, provider: LlmProvider |
     await prisma.request.update({ where: { id: requestId }, data: { mode: "kö", error: "ANTHROPIC_API_KEY saknas, så sidan kan inte söka själv. Beställningen tas av torsdagskörningen." } });
     return;
   }
-  const budget = await getBudget();
+  await reapStaleRequests();
+  // Gör anspråk på beställningen först (atomärt), så att två samtidiga anrop inte kör samma sökning,
+  // och kontrollera sedan budgeten med alla andra pågående sökningar som reserverat sin del.
+  const claimed = await prisma.request.updateMany({ where: { id: requestId, status: "ny", mode: "direkt" }, data: { status: "pågår", error: null } });
+  if (claimed.count !== 1) return;
+  const budget = await getBudget(new Date(), requestId);
   if (!budget.allowed) {
-    await prisma.request.update({ where: { id: requestId }, data: { mode: "kö", error: `Månadens budget är nådd (${budget.spentUsd.toFixed(2)} av ${budget.budgetUsd} USD). Beställningen tas av torsdagskörningen istället.` } });
+    const reserved = budget.reservedUsd > 0 ? `, och ${budget.reservedUsd.toFixed(2)} USD är reserverat för sökningar som pågår` : "";
+    await prisma.request.update({ where: { id: requestId }, data: { status: "ny", mode: "kö", error: `Månadens budget är nådd (${budget.spentUsd.toFixed(2)} av ${budget.budgetUsd} USD${reserved}). Beställningen tas av torsdagskörningen istället.` } });
     return;
   }
-  await prisma.request.update({ where: { id: requestId }, data: { status: "pågår", error: null } });
 
   const [profileRow, ratings, recent] = await Promise.all([
     prisma.profile.findUnique({ where: { id: 1 } }),

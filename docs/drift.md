@@ -15,7 +15,7 @@ Om namnet `family-hub` är upptaget: välj ett annat i `fly launch` och uppdater
 ## 2. Hemligheter
 
 ```bash
-fly secrets set FAMILY_PASSWORD='välj-ett-lösenord' \
+fly secrets set FAMILY_PASSWORD='välj-ett-långt-lösenord-minst-16-tecken' \
   SESSION_SECRET="$(openssl rand -hex 32)" \
   AGENT_TOKEN="$(openssl rand -hex 32)"
 ```

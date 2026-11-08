@@ -1,6 +1,7 @@
 import "server-only";
 import { type City, type FoodSpot, type Item, type Origin, type PackedFood, type Profile } from "@family-hub/logic";
 import { db } from "@/lib/db";
+import { reapStaleRequests } from "@/lib/agent/runner";
 import { runKey, type PlaceView, type RunView, type StoredRating, type Weather } from "@/lib/suggest";
 import type { Run } from "@/generated/prisma/client";
 
@@ -58,5 +59,6 @@ export async function getRatings(): Promise<StoredRating[]> {
 }
 
 export async function getRequests() {
+  await reapStaleRequests();
   return db().request.findMany({ orderBy: { createdAt: "desc" }, take: 20 });
 }

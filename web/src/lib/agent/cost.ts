@@ -18,12 +18,16 @@ export function costUsd(usage: LlmUsage, model: string): number | null {
   return Math.round((tokens + usage.webSearches * WEB_SEARCH_USD) * 10000) / 10000;
 }
 
-export interface BudgetState { budgetUsd: number; spentUsd: number; maxRunUsd: number; allowed: boolean; leftUsd: number }
+export interface BudgetState { budgetUsd: number; spentUsd: number; reservedUsd: number; maxRunUsd: number; allowed: boolean; leftUsd: number }
 
-/** En sökning får starta bara om även ett dyrt utfall ryms inom månadens tak. */
-export function budgetState(spentUsd: number, budgetUsd: number, maxRunUsd: number): BudgetState {
-  const left = Math.max(0, budgetUsd - spentUsd);
-  return { budgetUsd, spentUsd, maxRunUsd, allowed: budgetUsd > 0 && spentUsd + maxRunUsd <= budgetUsd, leftUsd: Math.round(left * 100) / 100 };
+/**
+ * En sökning får starta bara om även ett dyrt utfall ryms inom månadens tak. Pågående sökningar har ännu inte
+ * skrivit sin kostnad, så var och en reserverar `maxRunUsd` (`inFlight`) tills den är klar.
+ */
+export function budgetState(spentUsd: number, budgetUsd: number, maxRunUsd: number, inFlight = 0): BudgetState {
+  const reservedUsd = Math.max(0, inFlight) * maxRunUsd;
+  const left = Math.max(0, budgetUsd - spentUsd - reservedUsd);
+  return { budgetUsd, spentUsd, reservedUsd, maxRunUsd, allowed: budgetUsd > 0 && spentUsd + reservedUsd + maxRunUsd <= budgetUsd, leftUsd: Math.round(left * 100) / 100 };
 }
 
 /** Första dagen i månaden kl 00:00 svensk tid, uttryckt i UTC. */

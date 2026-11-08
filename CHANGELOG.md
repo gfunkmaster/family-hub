@@ -2,6 +2,9 @@
 
 ## Ej släppt
 
+- Hårdare drift: inloggningen spärras efter 5 felaktiga lösenord per IP-adress och kvart (`web/src/lib/ratelimit.ts`), och `lokalt.sh` skapar längre lösenord.
+- Direktsökningar som fastnat på "pågår" i mer än 20 minuter (till exempel när maskinen startats om) sätts till "fel" med en förklaring i stället för att visa "Söker…" för evigt.
+- Budgettaket håller även vid samtidiga sökningar: en sökning gör anspråk på beställningen atomärt, och varje pågående sökning reserverar `AGENT_MAX_RUN_USD` tills den är klar.
 - Klädtips efter vädret: varje dag med prognos får en ruta "Kläder" med råd efter temperatur, regn, skillnaden mellan morgon och eftermiddag och yngsta barnets ålder (`clothingFor` i `packages/logic`). Saknas temperatur visas inget. Tumregler, inte ett löfte.
 - Ny formgivning: varm och tydlig palett (Fjordnatt, Lingon, Mossa, Sol), Familjen Grotesk och Atkinson Hyperlegible Next. Varje förslag leder med restiden som en avgångstavla. Fungerar på mobil, iPad (kolumn bredvid texten, minst 44 px att trycka på) och dator (förslagen i två kolumner), i ljust och mörkt läge.
 - Efter "Använd där jag är nu" visas adressen du står vid ("Du är vid Storgatan 3, Södermalm, Stockholm") och sparas som platsens namn och adress. Slås upp via OpenStreetMaps Nominatim från servern, bara när du trycker på knappen.

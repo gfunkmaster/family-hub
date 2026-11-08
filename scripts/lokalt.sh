@@ -40,7 +40,7 @@ fi
 
 # 2. web/.env (skapas en gång, med slumpade hemligheter)
 if [ ! -f "$ENV_FILE" ]; then
-  PASSWORD="familj-$(openssl rand -hex 3)"
+  PASSWORD="familj-$(openssl rand -hex 6)"
   cat > "$ENV_FILE" <<ENV
 DATABASE_URL=$DATABASE_URL
 FAMILY_PASSWORD=$PASSWORD
