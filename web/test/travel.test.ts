@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fetchTrip, isoMinutes, summarizeTrip, TravelError } from "../src/lib/travel/resrobot.ts";
+import { fetchTrip, isoMinutes, readableName, summarizeTrip, TravelError, walkingBeatsTransit } from "../src/lib/travel/resrobot.ts";
 
 const place = (name: string, time: string) => ({ name, time });
 const tripJson = {
@@ -58,4 +58,24 @@ test("resrobot: koordinater, tid och nyckel skickas i anropet", async () => {
   assert.equal(p.get("destCoordLong"), "18.1");
   assert.equal(p.get("date"), "2026-11-14");
   assert.equal(p.get("accessId"), "NYCKEL");
+});
+
+test("gå eller åka: nästan bara gång med en kort åktur slår kollektivt", () => {
+  const t = summarizeTrip(tripJson);
+  assert.ok(t); // 24 min totalt, 17 min gång, 7 min åktur
+  assert.equal(walkingBeatsTransit(t, 22), true);   // rakt dit tar 22 min ≤ 24 + 3
+  assert.equal(walkingBeatsTransit(t, 31), false);  // för långt att gå med barn
+  const short = summarizeTrip({ Trip: [{ duration: "PT18M", LegList: { Leg: [
+    { type: "WALK", duration: "PT8M", dist: 664, Origin: place("A", "08:32:00"), Destination: place("Västra Skogen", "08:40:00") },
+    { type: "JNY", name: "tunnelbana 10", duration: "PT1M", Origin: place("Västra Skogen", "08:40:00"), Destination: place("Huvudsta", "08:41:00") },
+    { type: "WALK", duration: "PT9M", dist: 734, Origin: place("Huvudsta", "08:41:00"), Destination: place("B", "08:50:00") },
+  ] } }] });
+  assert.ok(short);
+  assert.equal(walkingBeatsTransit(short, 17), true);  // 17 min rakt dit mot 18 min med byte
+  assert.equal(walkingBeatsTransit(short, 28), false); // 28 > 18 + 8
+});
+
+test("läsbart namn ersätter koordinater", () => {
+  assert.equal(readableName("59.343600, 17.989800", "Lekparken"), "Lekparken");
+  assert.equal(readableName("Huvudsta T-bana", "Lekparken"), "Huvudsta T-bana");
 });

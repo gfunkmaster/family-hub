@@ -208,3 +208,22 @@ test("dagsplanen får lunch även när en aktivitet täcker lunchtiden", () => {
   assert.equal(lunch.time, "13:00");
   for (const b of plan) if (b !== lunch && b.kind !== "info") assert.ok(L.toMin(lunch.time) >= L.toMin(b.endTime) || L.toMin(lunch.endTime) <= L.toMin(b.time), "lunch overlaps " + b.title);
 });
+
+test("kläder efter väder: temperaturtrappa, regn, lager och bebis", () => {
+  assert.equal(L.clothingFor(null, 9), null);
+  assert.equal(L.clothingFor({ date: "2026-11-09" }, 9), null); // ingen temperatur: vi gissar inte
+  assert.match(L.clothingFor({ date: "d", high: 25, low: 15 }).headline, /Varmt/);
+  assert.match(L.clothingFor({ date: "d", high: 17, low: 12 }).headline, /Milt/);
+  assert.match(L.clothingFor({ date: "d", high: 10, low: 6 }).headline, /Svalt/);
+  assert.match(L.clothingFor({ date: "d", high: 5, low: 2 }).headline, /Kallt/);
+  assert.match(L.clothingFor({ date: "d", high: -3, low: -9 }).headline, /Mycket kallt/);
+  const rain = L.clothingFor({ date: "d", high: 5, low: 2, precip: 70 }).items.join(" ");
+  assert.match(rain, /regnjacka/i);
+  assert.doesNotMatch(L.clothingFor({ date: "d", high: 5, low: 2, precip: 10 }).items.join(" "), /regn/i);
+  assert.match(L.clothingFor({ date: "d", high: 5, low: 2, precip: 35 }).items.join(" "), /skurar/);
+  assert.match(L.clothingFor({ date: "d", high: 5, low: 2, precipMm: 2 }).items.join(" "), /regnjacka/i);
+  assert.match(L.clothingFor({ date: "d", high: 15, low: 5 }).items.join(" "), /lager som går att ta av/);
+  assert.match(L.clothingFor({ date: "d", high: 5, low: 2 }, 9).items.join(" "), /Bebis i vagn/);
+  assert.doesNotMatch(L.clothingFor({ date: "d", high: 5, low: 2 }, 30).items.join(" "), /Bebis/);
+  assert.match(L.clothingFor({ date: "d", high: 5 }).headline, /Kallt/); // bara högsta känd
+});

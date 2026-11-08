@@ -48,6 +48,22 @@ export function summarizeTrip(json: unknown): TripSummary | null {
   };
 }
 
+/**
+ * Är det klokare att gå hela vägen? Ja när gångtiden rakt dit är högst 3 min längre än resan,
+ * eller när resan nästan bara är gång med en kort åktur (högst 3 min), och sträckan är gångbar med barn (högst 30 min).
+ */
+export function walkingBeatsTransit(trip: TripSummary, directWalkMin: number): boolean {
+  if (directWalkMin > 30) return false;
+  const ride = trip.legs.filter((l) => l.kind === "transit").reduce((a, l) => a + l.min, 0);
+  const mostlyWalking = trip.totalMin > 0 && trip.walkMin / trip.totalMin >= 0.8 && ride <= 3;
+  return directWalkMin <= trip.totalMin + 3 || (mostlyWalking && directWalkMin <= trip.totalMin + 8);
+}
+
+/** En koordinat som visningsnamn ("59.343600, 17.989800") ersätts av ett läsbart namn. */
+export function readableName(name: string, fallback: string): string {
+  return /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(name.trim()) ? fallback : name;
+}
+
 export class TravelError extends Error {
   readonly status: number;
   constructor(message: string, status: number) { super(message); this.status = status; }

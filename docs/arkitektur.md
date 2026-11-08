@@ -19,6 +19,10 @@
 | Bilder utifrån laddas inte | Inga bilder på förslagen |
 | Allt måste ligga i en fil | `scripts/build.mjs` lägger ihop stil, logik och UI |
 
+## Kläder efter väder
+
+`clothingFor` i `packages/logic` ger klädtips per dag av prognosen i körningen (`weather`): temperaturtrappa (varmt, milt, svalt, kallt, mycket kallt), regn (risk i procent eller mm), stor skillnad mellan morgon och eftermiddag och ett extra råd när yngsta barnet är under 12 månader. Utan temperatur ger funktionen `null` och sidan visar inget. Råden är tumregler och visas som det.
+
 ## Restid
 
 Den schemalagda körningen räknar restid från familjens utgångspunkt (beställningens plats, stadens standardplats eller centrum) och sparar `lat`/`lng` för varje förslag. När familjen väljer en annan plats i appen räknas restiden om lokalt med en grov modell (fågelvägen × 1,3, gång 4,5 km/h, bil 35/65 km/h, kollektivt 20 km/h + 10 min). Kollektivt är alltså en grov siffra tills man trycker "Visa kollektivresa" på ett förslag: då frågar sidan Trafiklab ResRobot Reseplanerare v2.1 via `/api/travel` (server, inloggning krävs, 10 minuters cache) och visar linje, byten, gångtid och avgångstider för den dag och tid förslaget gäller. ResRobot saknar uppgift om barnvagn, så det står det i kortet. Bil är fortfarande uppskattad. Vägrutter finns i [ROADMAP.md](../ROADMAP.md).
@@ -35,7 +39,7 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 
 `web/` är en Next.js-sida (App Router) i strikt TypeScript som ska ersätta artifacten. Den har inte artifactens begränsningar:
 
-- **Position:** sidan ber om telefonens GPS när du väljer "Där jag är nu", och restid och kostnad räknas om direkt.
+- **Position:** sidan ber om telefonens GPS när du väljer "Där jag är nu", och restid och kostnad räknas om direkt. Adressen slås upp via `/api/reverse` (OpenStreetMaps Nominatim, från servern, inloggning krävs, en timmes cache) och visas under knappen. Koordinaterna skickas alltså till OpenStreetMap, och bara när du trycker.
 - **Data:** Postgres via Prisma 7. Tabellerna speglar artifactens databas, så flytten är en import.
 - **Agenten:** den schemalagda körningen fortsätter att vara agenten och kör på Claude-prenumerationen. Den läser och skriver via `/api/agent/*` med en Bearer-token, istället för artifactens databasverktyg. Allt den skickar valideras innan det sparas.
 - **Inloggning:** ett familjelösenord ger en signerad kaka (HMAC) som gäller i 90 dagar. Bara sidorna kräver den. Agentens API har sin egen token.
