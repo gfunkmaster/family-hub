@@ -1,10 +1,10 @@
 # Hemsidan (web/) med det delade logikpaketet. Byggs från repots rot.
 FROM node:22-slim AS deps
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY packages/logic/package.json packages/logic/
 COPY web/package.json web/
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 FROM deps AS build
 COPY packages packages
