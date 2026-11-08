@@ -2,7 +2,9 @@
 
 ## Ej släppt
 
+- Verklig kollektivresa per förslag: knappen "Visa kollektivresa" hämtar linje, byten, gångtid och avgångstider från Trafiklab ResRobot via `/api/travel` (kräver `TRAFIKLAB_KEY`, valfri). Resan hämtas först när man trycker, för att spara kvoten.
 - `scripts/lokalt.sh` kör hemsidan lokalt på Macen, med import av data från appen.
+- Direktsökningen hittar själv lokala källor runt utgångspunkten (kommun, bibliotek, familjecentraler, babycafé, simhallar, museer). Stadens källregister är bara en startlista och gäller inom sökområdet.
 
 ## 0.4.0 – 2026-11-06
 

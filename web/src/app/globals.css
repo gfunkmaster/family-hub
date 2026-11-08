@@ -101,3 +101,4 @@ form.inline{display:inline}
 fieldset{border:0;padding:0;margin:0}
 fieldset legend{font-weight:600;margin-bottom:.25rem}
 .chip-radio{display:inline-flex;gap:.3rem;align-items:center;margin-right:.75rem}
+.trip{margin:6px 0}.legs{margin:4px 0 4px 18px;padding:0;font-size:14px}

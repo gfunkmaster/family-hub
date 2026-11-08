@@ -21,7 +21,7 @@
 
 ## Restid
 
-Den schemalagda körningen räknar restid från familjens utgångspunkt (beställningens plats, stadens standardplats eller centrum) och sparar `lat`/`lng` för varje förslag. När familjen väljer en annan plats i appen räknas restiden om lokalt med en grov modell (fågelvägen × 1,3, gång 4,5 km/h, bil 35/65 km/h, kollektivt 20 km/h + 10 min). Riktiga reseplanerare (Trafiklab, vägrutter) kräver anrop från en server och finns i [ROADMAP.md](../ROADMAP.md).
+Den schemalagda körningen räknar restid från familjens utgångspunkt (beställningens plats, stadens standardplats eller centrum) och sparar `lat`/`lng` för varje förslag. När familjen väljer en annan plats i appen räknas restiden om lokalt med en grov modell (fågelvägen × 1,3, gång 4,5 km/h, bil 35/65 km/h, kollektivt 20 km/h + 10 min). Kollektivt är alltså en grov siffra tills man trycker "Visa kollektivresa" på ett förslag: då frågar sidan Trafiklab ResRobot Reseplanerare v2.1 via `/api/travel` (server, inloggning krävs, 10 minuters cache) och visar linje, byten, gångtid och avgångstider för den dag och tid förslaget gäller. ResRobot saknar uppgift om barnvagn, så det står det i kortet. Bil är fortfarande uppskattad. Vägrutter finns i [ROADMAP.md](../ROADMAP.md).
 
 ## Rangordning
 
@@ -46,6 +46,7 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 "Sök nu" under Beställ låter sidan söka själv via Claude API (Messages API med verktygen `web_search` och `web_fetch`), utan att vänta på torsdagen. Beställningen sparas först, och sökningen körs efter svaret med `after()` från Next. Sidan laddar om var 10:e sekund tills den är klar.
 
 - **Var:** där du är (GPS), en adress eller ort, eller en sparad stad, med en radie i minuter som räknas om till km (`radiusKmForMinutes`).
+- **Källor:** följer utgångspunkten. Stadens källregister (`cities.sources`) skickas med som startlista för det som ligger inom sökområdet, och agenten får alltid i uppgift att hitta lokala källor runt platsen själv (kommun, bibliotek, familjecentraler, babycafé, simhallar, museer) och redovisa i `summary` vilka som hämtades eller nekades. Utan det missas allt som inte står i registret, särskilt vid sökning runt GPS-position utan stad.
 - **Mat:** svaret innehåller matställen nära förslagen och matlådor för barnens ålder. Matlådorna måste ha en källa på livsmedelsverket.se, annars avvisas svaret.
 - **Kontroll:** svaret går genom samma `parseRun` som torsdagskörningen. Perioden, staden och platsen tas från beställningen, inte från modellen.
 - **Budget:** varje sökning sparar sin förbrukning i `AgentUsage`. En ny sökning startar bara om månadens kostnad plus `AGENT_MAX_RUN_USD` ryms i `AGENT_MONTHLY_BUDGET_USD`. Annars hamnar beställningen i kön.

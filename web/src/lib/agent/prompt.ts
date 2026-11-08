@@ -29,6 +29,9 @@ Regler:
 - Åldersråd för mat följer Livsmedelsverket. Varje matlåda ska ha minst en källa på https://www.livsmedelsverket.se/ som stöder att maten passar åldern.
 - Svara till sist med EXAKT ett JSON-objekt i ett kodblock märkt json, och inget efter det.`;
 
+/** Källorna följer utgångspunkten, inte en förvald stad: agenten ska själv hitta de lokala kalendrarna runt platsen. */
+export const LOCAL_SOURCES = "Hitta själv de lokala källorna för området runt utgångspunkten, oavsett vilken stad som är vald: kommunens eller stadsdelens evenemangskalender, närmaste bibliotek, öppna förskolor och familjecentraler, kyrkornas babycafé, simhallar och museer inom radien. Skriv i summary vilka källor du faktiskt hämtade och vilka som nekades eller saknade evenemang.";
+
 const SCHEMA = `{
   "place": {"name": "kort namn på området", "lat": tal, "lng": tal} eller null,
   "summary": "1–3 meningar: område, utgångspunkt, väder och vad som inte gick att verifiera",
@@ -67,7 +70,8 @@ export function buildResearchPrompt(input: PromptInput): { system: string; promp
     input.disliked.length ? `Ta inte med: ${input.disliked.join(", ")}.` : "",
     input.recentlyVisited.length ? `Nyligen besökta, ta inte med igen: ${input.recentlyVisited.join(", ")}.` : "",
     r.note ? `Önskemål: ${r.note}.` : "",
-    sources ? `Börja med de här källorna:\n${sources}` : "",
+    sources ? `Kända källor${r.cityName ? ` för ${r.cityName}` : ""}. Använd dem bara för det som ligger inom sökområdet:\n${sources}` : "",
+    LOCAL_SOURCES,
     "",
     "Uppgift:",
     `1. ${dates.length === 1 ? "6–10" : dates.length <= 3 ? "6–12" : "10–20"} förslag som passar barnens ålder, en blandning av gratis, under 300 kr och dyrare. Återkommande pass (t.ex. babysång varje tisdag) blir ett förslag med ett dates-element per tillfälle. Ta med några platser som fungerar alla dagar.`,

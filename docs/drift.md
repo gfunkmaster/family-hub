@@ -30,6 +30,12 @@ fly secrets set ANTHROPIC_API_KEY='sk-ant-…' AGENT_MONTHLY_BUDGET_USD=10 AGENT
 
 `AGENT_MODEL` är `claude-sonnet-5-5` om den inte sätts. Utan nyckel är "Sök nu" avstängd och allt går via kön.
 
+Kollektivresor (valfritt). Gratis nyckel för ResRobot Reseplanerare v2.1 skapas på trafiklab.se (Bronze: 25 000 anrop per 30 dagar). Utan nyckel döljs ingenting, men "Visa kollektivresa" svarar att resan inte kan hämtas:
+
+```bash
+fly secrets set TRAFIKLAB_KEY='…'
+```
+
 ## 3. Driftsätt
 
 ```bash
