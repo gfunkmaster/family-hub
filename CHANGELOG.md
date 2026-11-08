@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Ikon och webbmanifest (`/icon.svg`, `/manifest.webmanifest`): sidan får en flikikon och kan läggas på hemskärmen. På Familj-sidan står det att en ledighet utan slutdatum betyder alla vardagar framåt.
 - Familj-sidan på hemsidan (`/familj`): barn, sovtider, lediga dagar och föräldraledighet, vad torsdagskörningen tar fram, budget, behov, intressen, hemstad och platser. "Spara där jag är nu" sparar telefonens position som en plats.
 - Profilen kontrolleras och rensas på servern (samma kontroll vid import): rimliga tal, giltiga tider och koordinater, inga okända fält.
 - Källrapport per direktsökning: Förslag visar vilka sidor sökningen faktiskt hämtade, vilka som misslyckades, vilka av stadens källor som inte försöktes och vilka som inte gav förslag. Loggen kommer från verktygssvaren i Claude API:et och sparas i `Run.fetched` (migrering `0003_kallogg`).
