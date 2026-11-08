@@ -44,6 +44,12 @@ test("budget: tillåter bara om även en dyr körning ryms", () => {
   assert.equal(budgetState(9.2, 10, 1).allowed, false);
   assert.equal(budgetState(0, 0, 1).allowed, false);
   assert.equal(budgetState(9.2, 10, 1).leftUsd, 0.8);
+  // Pågående sökningar reserverar maxRunUsd var, så samtidiga sökningar kan inte spräcka taket.
+  assert.equal(budgetState(6, 10, 1, 3).allowed, true);   // 6 + 3 + 1 = 10
+  assert.equal(budgetState(6.1, 10, 1, 3).allowed, false);
+  assert.equal(budgetState(0, 10, 1, 10).allowed, false);
+  assert.equal(budgetState(2, 10, 1, 2).reservedUsd, 2);
+  assert.equal(budgetState(2, 10, 1, 2).leftUsd, 6);
 });
 
 test("månadsstart i svensk tid", () => {

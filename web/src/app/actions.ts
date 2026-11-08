@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -9,6 +9,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, verifySessionToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { createLimiter } from "@/lib/ratelimit";
 import { isValidId } from "@/lib/validate";
 import { runDirectSearch } from "@/lib/agent/runner";
 import { runKey } from "@/lib/suggest";
@@ -18,9 +19,17 @@ async function requireFamily(): Promise<void> {
   if (!(await verifySessionToken(token, env.sessionSecret))) redirect("/login");
 }
 
+// Fem felaktiga lösenord per IP-adress och kvart. Fly sätter fly-client-ip och skriver över klientens egna rubriker.
+const loginLimiter = createLimiter({ max: 5, windowMs: 15 * 60_000 });
+
 export async function login(_prev: { error: string } | null, form: FormData): Promise<{ error: string } | null> {
   const pw = String(form.get("password") ?? "");
-  if (!(await passwordMatches(pw, env.familyPassword, env.sessionSecret))) return { error: "Fel lösenord." };
+  const h = await headers();
+  const ip = h.get("fly-client-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "lokal";
+  const gate = loginLimiter.check(ip);
+  if (!gate.ok) return { error: `För många försök. Vänta ${Math.ceil(gate.retryAfterSec / 60)} min och försök igen.` };
+  if (!(await passwordMatches(pw, env.familyPassword, env.sessionSecret))) { loginLimiter.fail(ip); return { error: "Fel lösenord." }; }
+  loginLimiter.reset(ip);
   (await cookies()).set(SESSION_COOKIE, await createSessionToken(env.sessionSecret), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: SESSION_DAYS * 86400,
   });
