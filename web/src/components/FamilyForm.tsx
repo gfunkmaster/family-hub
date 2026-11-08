@@ -93,7 +93,7 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
         <h2>Lediga dagar</h2>
         <label className="check"><input type="checkbox" checked={weekends} onChange={(e) => touch(setWeekends)(e.target.checked)} /> Helger</label>
         <label className="check"><input type="checkbox" checked={weekdays} onChange={(e) => touch(setWeekdays)(e.target.checked)} /> Vardagar (föräldraledig)</label>
-        {weekdays ? <label>Ledig till och med<input type="date" value={leaveUntil} onChange={(e) => touch(setLeaveUntil)(e.target.value)} /></label> : null}
+        {weekdays ? <><label>Ledig till och med<input type="date" value={leaveUntil} onChange={(e) => touch(setLeaveUntil)(e.target.value)} /></label>{!leaveUntil ? <p className="meta">Utan slutdatum planeras alla vardagar framåt som lediga.</p> : null}</> : null}
         <label>Torsdagskörningen tar fram, när inget är beställt
           <select value={autoRun} onChange={(e) => touch(setAutoRun)(e.target.value as typeof autoRun)}>
             <option value="helg">Kommande helg</option>

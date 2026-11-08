@@ -43,7 +43,7 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 23. **Familj-sidan.** Klar (`/familj`). Kvar: standardplats per stad, som hör till punkt 25.
 24. **Schema för vecka och månad.** Dagsplanen med mat finns (`/plan`). Kvar: schemat för vecka och månad, och att välja flera förslag till samma dag.
 25. **Städer och källor.** Redigera transport, restidsgräns och källregister.
-26. **Installera som app.** Webbmanifest och ikon, så att sidan kan läggas på hemskärmen.
+26. **Installera som app.** Manifest och SVG-ikon finns. Kvar: PNG-ikoner (192, 512 och Apple touch) för bästa stöd på iPhone.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.
 28. **Fler leverantörer för direktsökning.** DeepSeek eller liknande via `LlmProvider`. Kräver en egen sökmotor (t.ex. Brave Search API), eftersom de saknar inbyggd webbsökning.
 29. **Geokodning på servern.** En adress eller ort utan koordinater får nu sina koordinater av agenten. En geokodare på servern ger restid redan innan sökningen.
