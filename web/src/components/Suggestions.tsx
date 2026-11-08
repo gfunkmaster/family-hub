@@ -12,6 +12,11 @@ import { useGeolocation } from "@/components/useGeolocation";
 type CityRow = City & { id: string; name: string };
 
 const dayName = (iso: string) => parseDate(iso).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+const dayParts = (iso: string) => {
+  const d = parseDate(iso);
+  return { day: d.getDate(), weekday: d.toLocaleDateString("sv-SE", { weekday: "long" }), month: d.toLocaleDateString("sv-SE", { month: "short" }).replace(".", "") };
+};
+const firstSentence = (t: string) => { const m = t.match(/^.{20,140}?[.!?](\s|$)/); return m ? m[0].trim() : t.length > 140 ? `${t.slice(0, 137).trim()}…` : t; };
 const kr = (n: number | null) => (n == null ? "?" : `${n.toLocaleString("sv-SE")} kr`);
 const MODE: Record<string, string> = { walk: "Gång", transit: "Kollektivt", car: "Bil" };
 const levelClass = (l: string) => (l === "säkert" ? "good" : l === "troligt" ? "" : l === "oklart" ? "warn" : "bad");
@@ -50,20 +55,32 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         ))}</div>
       ) : null}
 
-      <div className="card">
-        <h2>{run.label} · {longRun ? `${dayName(run.dates[0] ?? run.from)} – ${dayName(run.dates[run.dates.length - 1] ?? run.to)}` : run.dates.map(dayName).join(" – ")}</h2>
-        {run.summary ? <p className="note">{run.summary}</p> : null}
-        {!longRun && run.weather.length ? (
-          <div className="weather">{run.weather.map((w) => (
-            <span key={w.date} className="wx">{dayName(w.date)}: {svNum(Number(w.high))}° / {svNum(Number(w.low))}°{fmtPrecip(w, true) ? `, ${fmtPrecip(w, true)}` : ""}</span>
-          ))}</div>
-        ) : null}
+      <header className="runhead">
+        <p className="where">{run.label}</p>
+        {longRun ? (
+          <h2>{dayName(run.dates[0] ?? run.from)} – {dayName(run.dates[run.dates.length - 1] ?? run.to)}</h2>
+        ) : (
+          <div className="heads">{run.dates.map((d) => {
+            const p = dayParts(d), w = run.weather.find((x) => x.date === d);
+            return (
+              <div key={d} className="dayhead">
+                <span className="num">{p.day}</span>
+                <span className="wd">{p.weekday}<br />{p.month}</span>
+                {w ? <span className="wx">{svNum(Number(w.high))}° / {svNum(Number(w.low))}°{fmtPrecip(w, true) ? `, ${fmtPrecip(w, true)}` : ""}</span> : null}
+              </div>
+            );
+          })}</div>
+        )}
         {!longRun ? run.weather.map((w) => <Clothes key={w.date} weather={w} profile={profile} date={w.date} withDay />) : null}
-        <SourceReportView fetched={run.fetched} registry={city.sources ?? []} items={run.items} />
-        <p className="meta">Sökt {new Date(run.createdAt).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" })} · {run.items.length} förslag</p>
-      </div>
+        <details className="runnote">
+          <summary>{run.summary ? firstSentence(run.summary) : "Om sökningen"}</summary>
+          {run.summary ? <p className="note">{run.summary}</p> : null}
+          <SourceReportView fetched={run.fetched} registry={city.sources ?? []} items={run.items} />
+          <p className="meta">Sökt {new Date(run.createdAt).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" })}, {run.items.length} förslag</p>
+        </details>
+      </header>
 
-      <div className="card">
+      <div className="controls">
         <label htmlFor="origin">Restid från
           <select id="origin" value={originChoice} onChange={(e) => { setOriginChoice(e.target.value); if (e.target.value === "gps") geo.request(); }}>
             <option value="auto">Standardplats ({run.origin?.name ?? "från sökningen"})</option>
@@ -99,15 +116,22 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
       ) : null}
 
       {mode === "dag"
-        ? days.map((d) => (
-          <div key={d.date} className="card day">
-            <div className="row between"><h3>{dayName(d.date)}</h3>{d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}</div>
-            <Clothes weather={d.weather} profile={profile} date={d.date} />
-            {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
-            {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
-          </div>
-        ))
-        : list.length ? list.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} />) : <div className="card empty">Inget matchar filtret.</div>}
+        ? days.map((d) => {
+          const p = dayParts(d.date);
+          return (
+            <section key={d.date} className="day" aria-label={`${p.weekday} ${p.day} ${p.month}`}>
+              <div className="dayhead small">
+                <span className="num">{p.day}</span>
+                <span className="wd">{p.weekday}<br />{p.month}</span>
+                {d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}
+              </div>
+              <Clothes weather={d.weather} profile={profile} date={d.date} />
+              {d.top.length ? d.top.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} compact lead={i === 0} plain={i > 0} />) : <p className="meta">Inget som passar den här dagen.</p>}
+              {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
+            </section>
+          );
+        })
+        : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
     </section>
   );
 }
@@ -190,7 +214,7 @@ function TransitTrip({ from, item, date }: { from: Origin; item: { title?: strin
   );
 }
 
-function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; compact?: boolean }) {
+function Card({ s, runId, date, from, compact = false, lead = false, plain = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; compact?: boolean; lead?: boolean; plain?: boolean }) {
   const [pending, start] = useTransition();
   const { item: it, cost, fit, travel, tier } = s;
   const vote = (verdict: "bra" | "nej" | "besokt") => start(() => rate({ key: s.key, runId, itemId: it.id, verdict }));
@@ -198,7 +222,7 @@ function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId:
   const costTxt = cost.total != null ? `Totalt ${kr(cost.total)}` : `Entré ${kr(cost.entry)}${cost.travel != null ? ` + resa ${kr(cost.travel)}` : ""}`;
   const when = (it.dates ?? []).filter((d) => !compact || d.date === s.date).map((d) => `${dayName(d.date)} ${d.from ?? ""}–${d.to ?? ""}`).join(" · ");
   return (
-    <article className={`card item ${it.conflict ? "conflict" : it.verified ? "verified" : ""}`}>
+    <article className={`card item ${it.conflict ? "conflict" : it.verified ? "verified" : ""}${lead ? " lead" : ""}${plain ? " plain" : ""}`}>
       <div className={`depart ${travel?.withinLimit === false ? "over" : ""}`} role="group" aria-label={`Restid: ${travelTxt}`}>
         <span className="mins">{travel?.min ?? "?"}</span>
         <span className="unit">min</span>

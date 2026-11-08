@@ -152,8 +152,6 @@ fieldset legend{font-weight:600;margin-bottom:.25rem}
   .wrap{max-width:1160px}
   section.view.on{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
   section.view.on > :not(.item){grid-column:1/-1}
-  .day{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
-  .day > :not(.item){grid-column:1/-1}
 }
 
 @media (prefers-reduced-motion: reduce){.toast{transition:none}}
@@ -163,3 +161,42 @@ fieldset legend{font-weight:600;margin-bottom:.25rem}
 .sourcereport{background:var(--soft);border-radius:10px;padding:8px 12px}
 .sourcereport h4{margin:8px 0 2px;font-size:15px}
 .sourcereport ul{margin:2px 0 6px 18px;padding:0;font-size:15px}
+
+/* Förslag: dagen är rubriken, huvudförslaget leder, resten är rader */
+.runhead{display:grid;gap:10px;padding-top:4px}
+.runhead .where{margin:0;color:var(--muted);font-weight:600}
+.runhead h2{font-size:30px}
+.heads{display:flex;flex-wrap:wrap;gap:6px 28px}
+.dayhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dayhead .num{font-family:var(--display);font-weight:700;font-size:64px;line-height:.85;font-variant-numeric:tabular-nums}
+.dayhead .wd{font-weight:600;line-height:1.2;text-transform:capitalize}
+.dayhead.small{margin:6px 0 2px}
+.dayhead.small .num{font-size:38px}
+.runnote{border-left:3px solid var(--line);padding-left:12px}
+.runnote summary{font-weight:400;color:var(--muted);font-size:15px}
+.runnote[open] summary{margin-bottom:6px}
+.controls{display:grid;gap:6px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.day{display:grid;gap:0;align-content:start}
+.item.lead{border-color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
+.item.lead .depart{padding:10px 16px}
+.item.lead .depart .mins{font-size:48px}
+.item.lead h3{font-size:22px}
+.item.plain{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:14px 0}
+.item.plain .depart .mins{font-size:24px}
+.day > .item.lead{margin-bottom:6px}
+@media (min-width:768px){
+  .item.lead .depart .mins{font-size:60px}
+  .item.plain .depart .mins{font-size:30px}
+}
+
+/* Familj: ett blad med avsnitt, inte en hög med rutor */
+.sheet{gap:0}
+.sheet .block{display:grid;gap:12px;padding:22px 0;border-top:1px solid var(--line)}
+.sheet .block:first-child{border-top:0}
+.sheet .block h2{font-size:24px}
+.age{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.band{display:grid;gap:4px;max-width:520px}
+.band .track{position:relative;height:18px;border-radius:9px;background:var(--soft)}
+.band .nap{position:absolute;top:0;bottom:0;border-radius:9px;background:var(--accent)}
+.band .hours{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.savebar{position:sticky;bottom:0;z-index:4;background:var(--bg);border-top:1px solid var(--line);padding:12px 0 calc(12px + env(safe-area-inset-bottom))}
