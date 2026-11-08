@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Beroenden är låsta: `package-lock.json` är committad, och CI och Dockerfile kör `npm ci` i stället för `npm install`.
 - Hårdare drift: inloggningen spärras efter 5 felaktiga lösenord per IP-adress och kvart (`web/src/lib/ratelimit.ts`), och `lokalt.sh` skapar längre lösenord.
 - Direktsökningar som fastnat på "pågår" i mer än 20 minuter (till exempel när maskinen startats om) sätts till "fel" med en förklaring i stället för att visa "Söker…" för evigt.
 - Budgettaket håller även vid samtidiga sökningar: en sökning gör anspråk på beställningen atomärt, och varje pågående sökning reserverar `AGENT_MAX_RUN_USD` tills den är klar.

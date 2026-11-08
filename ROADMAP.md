@@ -26,7 +26,7 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 
 ## P3: Teknik
 
-14. **Lås beroenden.** Kör `npm install` och committa `package-lock.json` (gick inte i miljön där repot skapades). Byt sedan CI till `npm ci`.
+14. ~~Lås beroenden.~~ Klart: `package-lock.json` är committad och CI och Dockerfile kör `npm ci`.
 15. **UI i TypeScript.** Löses av hemsidan, som är TypeScript rakt igenom. Artifactens `src/app.js` tas bort när hemsidan har tagit över.
 16. **E2E-test.** Playwright med mockad Claude-runtime (`window.claude.use`) som renderar Förslag, Dagsplan och Familj med testdata och kollar att det inte blir skriptfel.
 17. **Publicering från CI.** Det finns inget API för att publicera en artifact från GitHub. Tills vidare publicerar Claude `dist/index.html`. Följ upp om det kommer ett API.
