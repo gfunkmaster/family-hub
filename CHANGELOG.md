@@ -2,7 +2,10 @@
 
 ## Ej släppt
 
-- Verklig kollektivresa per förslag: knappen "Visa kollektivresa" hämtar linje, byten, gångtid och avgångstider från Trafiklab ResRobot via `/api/travel` (kräver `TRAFIKLAB_KEY`, valfri). Resan hämtas först när man trycker, för att spara kvoten.
+- Klädtips efter vädret: varje dag med prognos får en ruta "Kläder" med råd efter temperatur, regn, skillnaden mellan morgon och eftermiddag och yngsta barnets ålder (`clothingFor` i `packages/logic`). Saknas temperatur visas inget. Tumregler, inte ett löfte.
+- Ny formgivning: varm och tydlig palett (Fjordnatt, Lingon, Mossa, Sol), Familjen Grotesk och Atkinson Hyperlegible Next. Varje förslag leder med restiden som en avgångstavla. Fungerar på mobil, iPad (kolumn bredvid texten, minst 44 px att trycka på) och dator (förslagen i två kolumner), i ljust och mörkt läge.
+- Efter "Använd där jag är nu" visas adressen du står vid ("Du är vid Storgatan 3, Södermalm, Stockholm") och sparas som platsens namn och adress. Slås upp via OpenStreetMaps Nominatim från servern, bara när du trycker på knappen.
+- Verklig kollektivresa per förslag: knappen "Visa kollektivresa" hämtar linje, byten, gångtid och avgångstider från Trafiklab ResRobot via `/api/travel` (kräver `TRAFIKLAB_KEY`, valfri). Resan hämtas först när man trycker, för att spara kvoten. Är det lika snabbt att gå hela vägen (högst 3 min längre, och högst 30 min) står det "Gå hela vägen" i stället, med kollektivresan bakom "Visa ändå".
 - `scripts/lokalt.sh` kör hemsidan lokalt på Macen, med import av data från appen.
 - Direktsökningen hittar själv lokala källor runt utgångspunkten (kommun, bibliotek, familjecentraler, babycafé, simhallar, museer). Stadens källregister är bara en startlista och gäller inom sökområdet.
 

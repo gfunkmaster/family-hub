@@ -119,6 +119,30 @@ export function fmtPrecip(w: Weather | null | undefined, long = false): string {
   if (w.precip != null) return svNum(w.precip) + " %" + (long ? " risk för nederbörd" : "");
   return "";
 }
+export interface Clothing { headline: string; items: string[] }
+const numOrNull = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
+/**
+ * Klädtips efter dagens väder och yngsta barnets ålder. Tumregler, inte ett löfte om att det räcker.
+ * Saknas temperaturen är svaret null: vi gissar inte väder.
+ */
+export function clothingFor(w: Weather | null | undefined, youngestMonths?: number | null): Clothing | null {
+  const high = numOrNull(w?.high), low = numOrNull(w?.low);
+  if (!w || (high == null && low == null)) return null;
+  const hi = high ?? (low as number), lo = low ?? hi;
+  const items: string[] = [];
+  let headline: string;
+  if (hi >= 22) { headline = "Varmt: lätta kläder och skydd mot solen"; items.push("Tunna, luftiga kläder i bomull eller ull", "Solhatt eller keps och solskydd på bar hud", "Vatten att dricka, och skugga för vagnen"); }
+  else if (hi >= 15) { headline = "Milt: långärmat och en tunn jacka"; items.push("Långärmad tröja eller body och långbyxor", "Tunn jacka eller kofta, tas av när solen kommer"); }
+  else if (hi >= 8) { headline = "Svalt: underställ och en riktig jacka"; items.push("Underställ av ull eller fleece närmast kroppen", "Tröja, byxor och en jacka som skyddar mot vind", "Tunn mössa, och tunna vantar om det blåser"); }
+  else if (hi >= 0) { headline = "Kallt: varma lager, mössa och vantar"; items.push("Underställ av ull, en fleece eller ulltröja och ett varmt ytterskikt (overall)", "Mössa som täcker öronen, vantar och varma strumpor", "Varma skor eller stövlar med ull i, och en åkpåse eller fårskinn i vagnen"); }
+  else { headline = "Mycket kallt: håll pauserna korta"; items.push("Tjockt underställ av ull, fleece och en varm overall", "Mössa, halsvärmare, vantar och varma, torra strumpor", "Skyddskräm i ansiktet, åkpåse i vagnen och byt till torra kläder vid behov", "Planera korta utomhuspass med inomhuspauser"); }
+  if (hi - lo >= 8) items.push("Stor skillnad mellan morgon och eftermiddag: klä i lager som går att ta av");
+  const mm = numOrNull(w.precipMm), pct = numOrNull(w.precip);
+  if ((mm != null && mm >= 1) || (pct != null && pct >= 50)) items.push("Regn väntas: regnjacka och regnbyxor, och gummistövlar eller vattentäta skor", "Regnskydd till vagnen och torra kläder i väskan");
+  else if ((mm != null && mm > 0) || (pct != null && pct >= 30)) items.push("Risk för skurar: ett regnskal i väskan");
+  if (youngestMonths != null && youngestMonths < 12 && hi < 22) items.push("Bebis i vagn: ett lager mer än du själv. Känn i nacken: svettig är för varmt, kall är för kallt");
+  return { headline, items };
+}
 export function isoWeek(iso: string): number {
   const d = parseDate(iso); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const w1 = new Date(d.getFullYear(), 0, 4);

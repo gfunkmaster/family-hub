@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import type { TripSummary } from "@/lib/travel/resrobot";
-import { fmtPrecip, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Origin, type Profile, type Tier } from "@family-hub/logic";
+import { readableName, walkingBeatsTransit, type TripSummary } from "@/lib/travel/resrobot";
+import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
 import { rate } from "@/app/actions";
 import Link from "next/link";
 import { cityFor, rankedSuggestions, suggestionsByDay, type Filters, type RunView, type StoredRating, type Suggestion } from "@/lib/suggest";
@@ -27,7 +27,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
   const places = (profile.places ?? []).filter(hasCoords);
 
   const origin: Origin | null = useMemo(() => {
-    if (originChoice === "gps") return geo.state.status === "ok" ? { name: "här du är nu", lat: geo.state.lat, lng: geo.state.lng } : null;
+    if (originChoice === "gps") return geo.state.status === "ok" ? { name: geo.state.address || "här du är nu", lat: geo.state.lat, lng: geo.state.lng } : null;
     if (originChoice === "run") return null;
     const chosen = originChoice === "auto" ? places.find((p) => p.id === city.defaultPlaceId) ?? places.find((p) => p.city === city.id) : places.find((p) => p.id === originChoice);
     return chosen && hasCoords(chosen) ? { name: chosen.name || chosen.address, lat: chosen.lat, lng: chosen.lng } : null;
@@ -57,6 +57,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
             <span key={w.date} className="wx">{dayName(w.date)}: {svNum(Number(w.high))}° / {svNum(Number(w.low))}°{fmtPrecip(w, true) ? `, ${fmtPrecip(w, true)}` : ""}</span>
           ))}</div>
         ) : null}
+        {!longRun ? run.weather.map((w) => <Clothes key={w.date} weather={w} profile={profile} date={w.date} withDay />) : null}
         <p className="meta">Sökt {new Date(run.createdAt).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" })} · {run.items.length} förslag</p>
       </div>
 
@@ -72,7 +73,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         <p className="meta" aria-live="polite">
           {originChoice === "gps" && geo.state.status === "loading" ? "Hämtar din position…" : null}
           {originChoice === "gps" && geo.state.status === "error" ? geo.state.message : null}
-          {originChoice === "gps" && geo.state.status === "ok" ? `Restid från din position (±${Math.round(geo.state.accuracy)} m). Uppskattat: fågelvägen × 1,3.` : null}
+          {originChoice === "gps" && geo.state.status === "ok" ? `Restid från din position${geo.state.address ? `, ${geo.state.address}` : ""} (±${Math.round(geo.state.accuracy)} m). Uppskattat: fågelvägen × 1,3.` : null}
           {originChoice !== "gps" && origin ? `Restid från ${origin.name}. Uppskattat: fågelvägen × 1,3.` : null}
           {originChoice !== "gps" && !origin ? "Restider som sökningen räknade fram." : null}
         </p>
@@ -97,8 +98,9 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
 
       {mode === "dag"
         ? days.map((d) => (
-          <div key={d.date} className="card">
+          <div key={d.date} className="card day">
             <div className="row between"><h3>{dayName(d.date)}</h3>{d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}</div>
+            <Clothes weather={d.weather} profile={profile} date={d.date} />
             {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
             {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
           </div>
@@ -108,7 +110,20 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
   );
 }
 
-function TransitTrip({ from, item, date }: { from: Origin; item: { lat?: number; lng?: number; dates?: { date: string; from?: string }[] }; date: string }) {
+function Clothes({ weather, profile, date, withDay = false }: { weather: Weather | null | undefined; profile: Profile; date: string; withDay?: boolean }) {
+  const months = (profile.children ?? []).map((c) => ageMonths(c.birthdate, date));
+  const tips = clothingFor(weather, months.length ? Math.min(...months) : null);
+  if (!tips) return null;
+  return (
+    <details className="clothes">
+      <summary>{withDay ? `${dayName(date)}: ` : "Kläder: "}{tips.headline}</summary>
+      <ul>{tips.items.map((t) => <li key={t}>{t}</li>)}</ul>
+      <p className="meta">Tumregler efter prognosen. Titta på barnet, inte bara på termometern.</p>
+    </details>
+  );
+}
+
+function TransitTrip({ from, item, date }: { from: Origin; item: { title?: string; venue?: string; lat?: number; lng?: number; dates?: { date: string; from?: string }[] }; date: string }) {
   const [state, setState] = useState<{ status: "idle" | "loading" } | { status: "ok"; trip: TripSummary | null } | { status: "error" }>({ status: "idle" });
   const { lat, lng } = item;
   if (typeof lat !== "number" || typeof lng !== "number") return null;
@@ -129,15 +144,29 @@ function TransitTrip({ from, item, date }: { from: Origin; item: { lat?: number;
       {state.status === "loading" ? <p className="meta">Hämtar resan…</p> : null}
       {state.status === "error" ? <p className="meta">Resan kunde inte hämtas just nu. <button className="small" onClick={load}>Försök igen</button></p> : null}
       {state.status === "ok" && !state.trip ? <p className="meta">Ingen kollektivresa hittades för den tiden (eller ingen hållplats nära).</p> : null}
-      {state.status === "ok" && state.trip ? (
-        <>
-          <p className="meta"><b>{state.trip.departs}–{state.trip.arrives}</b> · {state.trip.totalMin} min · {state.trip.transfers} byten · {state.trip.walkMin} min gång · från {from.name || "vald plats"} (ResRobot)</p>
-          <ol className="legs">{state.trip.legs.map((l, i) => (
-            <li key={i}>{l.kind === "walk" ? `Gå ${l.min} min${l.meters ? ` (${l.meters} m)` : ""} till ${l.to}` : `${l.label}${l.direction ? ` mot ${l.direction}` : ""} från ${l.from} ${l.departs} till ${l.to} ${l.arrives}`}</li>
-          ))}</ol>
-          <p className="meta">Tillgänglighet för barnvagn ingår inte i ResRobots data.</p>
-        </>
-      ) : null}
+      {state.status === "ok" && state.trip ? (() => {
+        const trip = state.trip;
+        const destName = item.venue || item.title || "målet";
+        const directKm = haversineKm(from, { lat, lng }) * 1.3;
+        const directWalkMin = Math.max(1, Math.round((directKm / 4.5) * 60));
+        const walkBetter = walkingBeatsTransit(trip, directWalkMin);
+        return (
+          <>
+            {walkBetter ? (
+              <p className="note"><b>Gå hela vägen:</b> ca {directWalkMin} min ({svNum(Math.round(directKm * 10) / 10)} km). Kollektivt tar {trip.totalMin} min och sparar ingenting, så ta promenaden.</p>
+            ) : (
+              <p className="meta"><b>{trip.departs}–{trip.arrives}</b> · {trip.totalMin} min · {trip.transfers} byten · {trip.walkMin} min gång · från {from.name || "vald plats"} (ResRobot)</p>
+            )}
+            <details open={!walkBetter}>
+              <summary className="meta">{walkBetter ? "Visa ändå kollektivresan" : "Resväg"}</summary>
+              <ol className="legs">{trip.legs.map((l, i) => (
+                <li key={i}>{l.kind === "walk" ? `Gå ${l.min} min${l.meters ? ` (${l.meters} m)` : ""} till ${readableName(l.to, destName)}` : `${l.label}${l.direction ? ` mot ${l.direction}` : ""} från ${l.from} ${l.departs} till ${l.to} ${l.arrives}`}</li>
+              ))}</ol>
+              {!walkBetter ? <p className="meta">Tillgänglighet för barnvagn ingår inte i ResRobots data.</p> : null}
+            </details>
+          </>
+        );
+      })() : null}
     </div>
   );
 }
@@ -151,6 +180,13 @@ function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId:
   const when = (it.dates ?? []).filter((d) => !compact || d.date === s.date).map((d) => `${dayName(d.date)} ${d.from ?? ""}–${d.to ?? ""}`).join(" · ");
   return (
     <article className={`card item ${it.conflict ? "conflict" : it.verified ? "verified" : ""}`}>
+      <div className={`depart ${travel?.withinLimit === false ? "over" : ""}`} role="group" aria-label={`Restid: ${travelTxt}`}>
+        <span className="mins">{travel?.min ?? "?"}</span>
+        <span className="unit">min</span>
+        <span className="how">{travel ? `${MODE[travel.mode] ?? ""}${travel.estimated && travel.min != null ? ", ca" : ""}` : "Okänd"}</span>
+        {travel?.withinLimit === false ? <span className="how">över er gräns</span> : null}
+      </div>
+      <div className="body">
       <div className="row between">
         <span className="kind">{it.kind === "event" ? "Evenemang" : "Plats"}{it.indoor ? " · inomhus" : it.indoor === false ? " · utomhus" : ""}</span>
         <span className={`chip ${tier === "gratis" ? "good" : tier === "okänt" ? "ghost" : ""}`}>{TIER_LABEL[tier]}</span>
@@ -159,7 +195,6 @@ function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId:
       <p className="meta">{it.venue}{when ? ` · ${when}` : ""}</p>
       <div className="row">
         <span className={`chip ${levelClass(fit.level)}`}>Ålder: {fit.level}</span>
-        <span className={`chip ${travel?.withinLimit === false ? "warn" : ""}`}>{travelTxt}</span>
         <span className="chip"><span className="cost">{costTxt}</span></span>
         {it.verified ? <span className="chip good">Verifierad</span> : <span className="chip ghost">Ej verifierad</span>}
       </div>
@@ -178,6 +213,7 @@ function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId:
         <button className="small" disabled={pending} aria-pressed={s.verdict === "nej"} onClick={() => vote("nej")}>Inte för oss</button>
         <button className="small" disabled={pending} aria-pressed={s.verdict === "besokt"} onClick={() => vote("besokt")}>Vi var där</button>
         <Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link>
+      </div>
       </div>
     </article>
   );

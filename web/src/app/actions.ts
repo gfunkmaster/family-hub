@@ -81,7 +81,8 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   let origin: { name: string; address?: string; lat?: number; lng?: number } | null = null;
   if (where === "gps") {
     if (!hasGps) return { error: "Tryck på Använd där jag är nu först." };
-    place = { name: placeName || "Där vi är", lat, lng };
+    const address = String(form.get("address") ?? "").trim().slice(0, 120);
+    place = { name: placeName || address || "Där vi är", ...(address ? { address } : {}), lat, lng };
     origin = { name: place.name, lat, lng };
   } else if (where === "plats") {
     if (!placeName) return { error: "Skriv en adress eller ort." };

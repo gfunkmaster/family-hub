@@ -1,104 +1,162 @@
-/* Layout: one column, app-like; sticky tab bar; cards with a left status stripe for verification */
+/*
+ * Utseende: varmt och tydligt. Restiden är det som sticker ut (en avgångstavla på varje kort), resten är lugnt.
+ * Färger: Fjordnatt (text), Lingon (handlingar), Mossa (verifierat), Sol (väder och restid).
+ * Typ: Familjen Grotesk för rubriker och siffror, Atkinson Hyperlegible Next för text.
+ * Bredder: mobil < 768 px, iPad 768–1099 px, dator ≥ 1100 px.
+ */
 :root{
-  --bg:#F2F4F3; --surface:#FFFFFF; --ink:#18232B; --muted:#5D6B73; --line:#DCE2E0;
-  --accent:#1F5F7A; --accent-ink:#FFFFFF; --soft:#E3EEF2;
-  --good:#2D7A4B; --warn:#A86B12; --bad:#B23B3B;
-  --good-bg:#E4F2E9; --warn-bg:#F7EEDC; --bad-bg:#F6E3E3;
-  --display:'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
-  --body:'Source Sans 3', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg:#FBF7F6; --surface:#FFFFFF; --ink:#2A1F2D; --muted:#6B5E6B; --line:#EADFDC;
+  --accent:#B3304A; --accent-ink:#FFFFFF; --soft:#F6E6E4;
+  --good:#3A7550; --warn:#8A5A0B; --bad:#A32B2B;
+  --good-bg:#E6F1E8; --warn-bg:#FBEFD2; --bad-bg:#F8E1DF;
+  --board:#2A1F2D; --board-ink:#FFFFFF; --board-num:#F2B632; --board-over:#FF9A8A;
+  --sun-bg:#FDF1CF;
+  --display:'Familjen Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --body:'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', 'Segoe UI', system-ui, -apple-system, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#12181C; --surface:#1A2227; --ink:#E6ECEE; --muted:#9AA8AF; --line:#2A353B;
-    --accent:#6FB3CF; --accent-ink:#0E1A20; --soft:#1F3440;
-    --good:#6BC28E; --warn:#E0A84A; --bad:#E57B7B;
-    --good-bg:#183326; --warn-bg:#3A2C14; --bad-bg:#3A1C1C;
+    --bg:#1D1820; --surface:#272029; --ink:#F3EAEC; --muted:#B5A6AE; --line:#3A3039;
+    --accent:#F0728A; --accent-ink:#2A0F16; --soft:#3A2630;
+    --good:#7CCB93; --warn:#E8B75B; --bad:#F09A9A;
+    --good-bg:#1E3427; --warn-bg:#3A2D14; --bad-bg:#3C1F22;
+    --board:#120E14; --board-ink:#F3EAEC; --board-num:#F2B632; --board-over:#FF9A8A;
+    --sun-bg:#3A2D14;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#12181C; --surface:#1A2227; --ink:#E6ECEE; --muted:#9AA8AF; --line:#2A353B;
-  --accent:#6FB3CF; --accent-ink:#0E1A20; --soft:#1F3440;
-  --good:#6BC28E; --warn:#E0A84A; --bad:#E57B7B;
-  --good-bg:#183326; --warn-bg:#3A2C14; --bad-bg:#3A1C1C;
+  --bg:#1D1820; --surface:#272029; --ink:#F3EAEC; --muted:#B5A6AE; --line:#3A3039;
+  --accent:#F0728A; --accent-ink:#2A0F16; --soft:#3A2630;
+  --good:#7CCB93; --warn:#E8B75B; --bad:#F09A9A;
+  --good-bg:#1E3427; --warn-bg:#3A2D14; --bad-bg:#3C1F22;
+  --board:#120E14; --board-ink:#F3EAEC; --board-num:#F2B632; --board-over:#FF9A8A;
+  --sun-bg:#3A2D14;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
 a{color:var(--accent)}
-h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
-h1{font-size:26px}
-h2{font-size:20px}
-h3{font-size:17px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15;font-weight:700}
+h1{font-size:28px}
+h2{font-size:21px}
+h3{font-size:18px}
+
+/* Sidan */
 .wrap{max-width:760px;margin:0 auto;padding:0 16px 96px}
 header.top{padding:20px 0 12px;display:grid;gap:6px}
 .sub{color:var(--muted);font-size:14px}
 .kid-chips{display:flex;flex-wrap:wrap;gap:6px}
-nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:4px;overflow-x:auto;margin:0 -16px;padding:8px 16px}
-nav.tabs a{flex:0 0 auto;text-decoration:none;color:var(--muted);font-weight:600;padding:8px 12px;border-radius:999px;font-size:15px}
+nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:6px;overflow-x:auto;margin:0 -16px;padding:8px 16px}
+nav.tabs a{flex:0 0 auto;text-decoration:none;color:var(--muted);font-weight:600;padding:9px 14px;border-radius:999px;font-size:16px}
 nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
-nav.tabs a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav.tabs a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 section.view{display:none;padding-top:16px}
 section.view.on{display:grid;gap:14px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
-.item{border-left:4px solid var(--line)}
-.item.verified{border-left-color:var(--good)}
-.item.conflict{border-left-color:var(--warn)}
+
+/* Kort */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:10px;align-content:start}
+.item{grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
+.item.conflict{border-color:var(--warn)}
+.item .body{display:grid;gap:8px;min-width:0}
+
+/* Restiden: en avgångstavla på varje kort. Det enda som får ta plats. */
+.depart{background:var(--board);color:var(--board-ink);border-radius:10px;padding:6px 14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;justify-self:start;line-height:1.1}
+.depart .mins{font-family:var(--display);font-weight:700;font-size:30px;font-variant-numeric:tabular-nums;color:var(--board-num)}
+.depart .unit{font-size:14px;opacity:.85}
+.depart .how{font-size:14px;opacity:.95}
+.depart.over .mins{color:var(--board-over)}
+
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .between{justify-content:space-between}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--ink);white-space:nowrap}
 .chip.good{background:var(--good-bg);color:var(--good)}
 .chip.warn{background:var(--warn-bg);color:var(--warn)}
 .chip.bad{background:var(--bad-bg);color:var(--bad)}
 .chip.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
 .meta{color:var(--muted);font-size:14px}
-.note{font-size:15px}
+.note{font-size:16px;max-width:62ch}
 .flag{background:var(--warn-bg);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:14px}
 .flag b{color:var(--warn)}
 .banner{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px}
 .cost{font-variant-numeric:tabular-nums;font-weight:700}
 .big{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
-button,.btn{font:inherit;font-weight:600;font-size:15px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.kind{font-size:13px;color:var(--muted);font-weight:600}
+
+/* Knappar och formulär */
+button,.btn{font:inherit;font-weight:600;font-size:16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-button.small{font-size:13px;padding:5px 9px;border-radius:8px}
+button.small,.btn.small{font-size:14px;padding:6px 11px;border-radius:9px}
 button[aria-pressed="true"]{background:var(--soft);border-color:var(--accent);color:var(--ink)}
 button:disabled{opacity:.55;cursor:default}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 label{font-size:14px;color:var(--muted);display:grid;gap:4px}
-input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
 input[type="checkbox"]{width:auto}
-.check{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:15px}
+.check{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.sources{font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.sources{font-size:14px;display:flex;flex-wrap:wrap;gap:4px 12px}
+
+/* Dagsplan */
 .timeline{display:grid;gap:0}
 .tl{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .tl:first-child{border-top:0}
 .tl .t{font-variant-numeric:tabular-nums;font-weight:700}
 .tl.vila .what{color:var(--muted)}
-.kind{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+.meal{border-top:1px solid var(--line);padding:.5rem 0}
+.meal summary{cursor:pointer}
+.cal-day{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
+.cal-day:first-child{border-top:0}
+
+/* Väder, tomt, meddelanden */
 .weather{display:flex;gap:10px;flex-wrap:wrap}
-.wx{background:var(--soft);border-radius:10px;padding:6px 10px;font-size:14px;font-variant-numeric:tabular-nums}
+.wx{background:var(--sun-bg);border-radius:10px;padding:6px 10px;font-size:14px;font-variant-numeric:tabular-nums}
 .empty{color:var(--muted);text-align:center;padding:20px}
 .stars button{padding:2px 6px;font-size:16px;border:0;background:none;color:var(--muted)}
 .stars button.on{color:var(--warn)}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
-@media (prefers-reduced-motion: reduce){.toast{transition:none}}
-.cal-day{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:15px}
-.cal-day:first-child{border-top:0}
 details summary{cursor:pointer;font-weight:600}
-
-/* Hemsidan */
-.wrap{max-width:760px;margin:0 auto;padding:0 16px 96px}
-nav.tabs a{flex:0 0 auto}
 form.inline{display:inline}
 .error{color:var(--bad);font-size:14px}
-.login{max-width:360px;margin:12vh auto 0;display:grid;gap:12px}
-.meal{border-top:1px solid var(--line);padding:.5rem 0}
-.meal summary{cursor:pointer}
+.login{max-width:380px;margin:12vh auto 0;display:grid;gap:12px}
 fieldset{border:0;padding:0;margin:0}
 fieldset legend{font-weight:600;margin-bottom:.25rem}
 .chip-radio{display:inline-flex;gap:.3rem;align-items:center;margin-right:.75rem}
-.trip{margin:6px 0}.legs{margin:4px 0 4px 18px;padding:0;font-size:14px}
+.trip{margin:6px 0}
+.legs{margin:4px 0 4px 18px;padding:0;font-size:15px}
+
+/* Pekskärm (mobil och iPad): minst 44 px att trycka på */
+@media (pointer:coarse){
+  button,.btn,nav.tabs a,select,input:not([type="checkbox"]){min-height:44px}
+  button.small,.btn.small{min-height:40px}
+}
+
+/* iPad och uppåt */
+@media (min-width:768px){
+  body{font-size:17px}
+  .wrap{max-width:900px;padding:0 24px 96px}
+  nav.tabs{margin:0 -24px;padding:8px 24px}
+  h1{font-size:34px}
+  .item{grid-template-columns:96px minmax(0,1fr);gap:6px 14px}
+  .depart{display:grid;justify-items:center;align-content:start;text-align:center;padding:10px 6px;gap:0;justify-self:stretch}
+  .depart .mins{font-size:40px}
+  .depart .unit{font-size:12px}
+  .depart .how{font-size:12px;margin-top:6px}
+}
+
+/* Dator: förslagen i två kolumner */
+@media (min-width:1100px){
+  .wrap{max-width:1160px}
+  section.view.on{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  section.view.on > :not(.item){grid-column:1/-1}
+  .day{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .day > :not(.item){grid-column:1/-1}
+}
+
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+.clothes{background:var(--sun-bg);border-radius:10px;padding:8px 12px}
+.clothes ul{margin:6px 0 6px 18px;padding:0;font-size:15px}
+.clothes li{margin:2px 0}

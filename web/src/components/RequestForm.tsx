@@ -52,11 +52,15 @@ export function RequestForm({ cities, budget }: { cities: { id: string; name: st
             {geo.state.status === "ok" ? `Position hämtad (±${Math.round(geo.state.accuracy)} m), uppdatera` : geo.state.status === "loading" ? "Hämtar position…" : "Använd där jag är nu"}
           </button>
           <input name="placeName" aria-label="Namn på platsen (valfritt)" maxLength={120} placeholder="Namn, t.ex. stugan (valfritt)" />
+          {geo.state.status === "ok" ? (
+            <span className="meta" role="status">{geo.state.address === undefined ? "Letar adress…" : geo.state.address ? `Du är vid ${geo.state.address}` : "Ingen adress hittades för positionen."}</span>
+          ) : null}
           {geo.state.status === "error" ? <span className="error">{geo.state.message}</span> : null}
         </div>
       ) : null}
       <input type="hidden" name="lat" value={where === "gps" && geo.state.status === "ok" ? geo.state.lat : ""} />
       <input type="hidden" name="lng" value={where === "gps" && geo.state.status === "ok" ? geo.state.lng : ""} />
+      <input type="hidden" name="address" value={where === "gps" && geo.state.status === "ok" ? (geo.state.address ?? "") : ""} />
       <label htmlFor="minutes">Hur långt vi åker
         <select id="minutes" name="minutes" defaultValue={45}>{MINUTES.map((m) => <option key={m} value={m}>högst {m} min</option>)}</select>
       </label>
