@@ -41,7 +41,7 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 21. **Flytta data från appen.** Importen i steg 4.
 22. **Byt den schemalagda körningen till sidans API.** Steg 5.
 23. **Familj-sidan.** Klar (`/familj`). Kvar: standardplats per stad, som hör till punkt 25.
-24. **Schema för vecka och månad.** Dagsplanen med mat finns (`/plan`). Kvar: schemat för vecka och månad, och att välja flera förslag till samma dag.
+24. **Schema för vecka och månad.** Vyn Schema finns under Förslag. Kvar: att spara ett schema, och att välja flera förslag till samma dag (`/plan` tar redan upp till fyra `item`).
 25. **Städer och källor.** Redigera transport, restidsgräns och källregister.
 26. **Installera som app.** Manifest och SVG-ikon finns. Kvar: PNG-ikoner (192, 512 och Apple touch) för bästa stöd på iPhone.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.

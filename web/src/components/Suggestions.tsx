@@ -6,7 +6,7 @@ import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, s
 import { rate } from "@/app/actions";
 import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
-import { cityFor, rankedSuggestions, suggestionsByDay, type Filters, type RunView, type StoredRating, type Suggestion } from "@/lib/suggest";
+import { cityFor, rankedSuggestions, scheduleFor, suggestionsByDay, type Filters, type RunView, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
 
 type CityRow = City & { id: string; name: string };
@@ -24,7 +24,7 @@ const levelClass = (l: string) => (l === "säkert" ? "good" : l === "troligt" ? 
 export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[]; cities: CityRow[]; profile: Profile; ratings: StoredRating[] }) {
   const [cityId, setCityId] = useState(runs[0]?.city ?? "");
   const [filters, setFilters] = useState<Filters>({ tier: "alla", ageOnly: false });
-  const [view, setView] = useState<"dag" | "lista">("dag");
+  const [view, setView] = useState<"dag" | "lista" | "schema">("dag");
   const [originChoice, setOriginChoice] = useState<string>("auto");
   const geo = useGeolocation();
 
@@ -46,6 +46,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
   const mode = longRun ? view : "lista";
   const list = mode === "lista" ? rankedSuggestions(run, profile, city, origin, ratings, filters) : [];
   const days = mode === "dag" ? suggestionsByDay(run, profile, city, origin, ratings, filters) : [];
+  const schedule = mode === "schema" ? scheduleFor(run, profile, city, origin, ratings) : null;
 
   return (
     <section className="view on" aria-label="Förslag">
@@ -112,10 +113,13 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         <div className="seg" role="group" aria-label="Visa">
           <button className="small" aria-pressed={view === "dag"} onClick={() => setView("dag")}>Dag för dag</button>
           <button className="small" aria-pressed={view === "lista"} onClick={() => setView("lista")}>Alla förslag</button>
+          <button className="small" aria-pressed={view === "schema"} onClick={() => setView("schema")}>Schema</button>
         </div>
       ) : null}
 
-      {mode === "dag"
+      {mode === "schema" && schedule ? <ScheduleView schedule={schedule} runId={run.id} /> : null}
+
+      {mode === "schema" ? null : mode === "dag"
         ? days.map((d) => {
           const p = dayParts(d.date);
           return (
@@ -132,6 +136,42 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
           );
         })
         : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
+    </section>
+  );
+}
+
+function ScheduleView({ schedule, runId }: { schedule: Schedule; runId: string }) {
+  if (!schedule.freeDays) {
+    return <div className="card empty">Inga lediga dagar i perioden. Är du föräldraledig? Slå på vardagar under <Link href="/familj">Familj</Link>.</div>;
+  }
+  const rest = schedule.days.filter((d) => !d.pick).length;
+  return (
+    <section className="schedule" aria-label="Schema">
+      <p className="meta">
+        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan.
+        {" "}Kostnad ca {kr(schedule.total)}{schedule.unknownCost ? " plus okända priser" : ""}{rest ? `, ${rest} vilodag${rest > 1 ? "ar" : ""}` : ""}.
+      </p>
+      {schedule.days.map((d) => {
+        const p = dayParts(d.date), it = d.pick?.item;
+        const time = it?.dates?.find((x) => x.date === d.date)?.from;
+        return (
+          <div key={d.date} className="sday">
+            <div className="dayhead small">
+              <span className="num">{p.day}</span>
+              <span className="wd">{p.weekday}<br />{p.month}</span>
+              {d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}
+            </div>
+            {d.pick && it ? (
+              <div className="spick">
+                <h3>{it.title}</h3>
+                <p className="meta">{[time, it.venue, d.pick.travel?.min != null ? `${MODE[d.pick.travel.mode] ?? ""}${d.pick.travel.estimated ? " ca" : ""} ${d.pick.travel.min} min` : null, d.pick.cost.total != null ? kr(d.pick.cost.total) : "pris okänt"].filter(Boolean).join(", ")}</p>
+                {d.alts.length ? <p className="meta">Annars: {d.alts.map((a) => a.item.title).join(", ")}</p> : null}
+                <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link></div>
+              </div>
+            ) : <p className="meta">Inget förslag den här dagen. En vilodag.</p>}
+          </div>
+        );
+      })}
     </section>
   );
 }

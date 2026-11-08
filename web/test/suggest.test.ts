@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dayPlanFor, rankedSuggestions, runKey, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
+import { dayPlanFor, rankedSuggestions, runKey, scheduleFor, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
 
 const profile = { adults: 2, children: [{ birthdate: "2026-01-27" }], availability: { weekdays: true, weekends: false } };
 const city = { id: "stockholm", name: "Stockholm", transport: { car: true, transit: true }, maxTravelMin: 45, carCostPerKm: 2.5, transitTicket: { adult: 43 }, childFreeTransitUnder: 12 };
@@ -75,4 +75,24 @@ test("dagsplan: måltiden får matlådor för yngsta barnet och matställen när
 test("runKey: stad, annars plats", () => {
   assert.equal(runKey("vaxjo", null, "x"), "vaxjo");
   assert.equal(runKey(null, { name: "Ystad C" }, "x"), "plats-ystad-c");
+});
+
+test("schema: en aktivitet per ledig dag, ingen upprepning inom två dagar och inget för stora barn", () => {
+  const sch = scheduleFor(run, profile, city, null, []);
+  assert.deepEqual(sch.days.map((d) => d.date), weekdays, "bara lediga dagar");
+  assert.equal(sch.freeDays, 5);
+  const ids = sch.days.map((d) => d.pick?.item.id ?? null);
+  assert.ok(!ids.includes("big-kids"), "Lekland passar inte åldern");
+  ids.forEach((id, i) => { if (id) assert.ok(![ids[i + 1], ids[i + 2]].includes(id), `${id} upprepas för tätt`); });
+  assert.equal(sch.days[0]?.pick?.item.id, "near", "Blubb är stängt på måndagen");
+  const noFree = scheduleFor(run, { ...profile, availability: { weekdays: false, weekends: false } }, city, null, []);
+  assert.equal(noFree.freeDays, 0);
+  assert.deepEqual(noFree.days, []);
+});
+
+test("schema: kostnaden summeras och okända priser markeras", () => {
+  const sch = scheduleFor(run, profile, city, null, []);
+  const known = sch.days.flatMap((d) => (d.pick?.cost.total != null ? [d.pick.cost.total] : []));
+  assert.equal(sch.total, known.reduce((a, b) => a + b, 0));
+  assert.equal(sch.unknownCost, sch.days.some((d) => d.pick && d.pick.cost.total == null));
 });

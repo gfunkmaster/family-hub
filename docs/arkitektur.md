@@ -33,7 +33,7 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 
 ## Schema för vecka och månad
 
-`schedulePeriod` väljer en huvudaktivitet per ledig dag (helger, plus vardagar vid föräldraledighet fram till `leaveUntil`), högst poäng först, aldrig samma förslag två dagar i rad eller med bara en dag emellan, och aldrig något som inte passar åldern.
+`schedulePeriod` väljer en huvudaktivitet per ledig dag (helger, plus vardagar vid föräldraledighet fram till `leaveUntil`), högst poäng först, aldrig samma förslag två dagar i rad eller med bara en dag emellan, och aldrig något som inte passar åldern. På hemsidan räknas det av `scheduleFor` (`web/src/lib/suggest.ts`) och visas som vyn Schema under Förslag när sökningen är längre än en helg. Schemat sparas inte; det räknas om från sökningen, profilen och betygen.
 
 ## Hemsidan
 
