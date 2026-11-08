@@ -278,14 +278,56 @@ export function parseProfile(body: unknown): Result<Profile> {
   };
 }
 
+/**
+ * En stad, från Städer-sidan eller importen. Okända fält tas bort och tal måste vara rimliga,
+ * eftersom stadens värden styr restid, kostnad och vad direktsökningen får som startlista.
+ */
 export function parseCity(id: string, body: unknown): Result<City & { name: string }> {
   if (!isObj(body)) return { ok: false, errors: [`cities.${id} är inget objekt`] };
   const errors: string[] = [];
-  if (!ID.test(id)) errors.push(`cities.${id}: id har otillåtna tecken`);
-  if (!isStr(body.name) || !body.name.trim()) errors.push(`cities.${id}.name saknas`);
-  if (body.sources !== undefined && !(Array.isArray(body.sources) && body.sources.every((s) => isObj(s) && isStr(s.name) && safeUrl(s.url)))) errors.push(`cities.${id}.sources[] måste ha name och en http(s)-adress`);
+  const at = `cities.${id}`;
+  if (!ID.test(id)) errors.push(`${at}: id har otillåtna tecken`);
+  if (!isStr(body.name) || !body.name.trim()) errors.push(`${at}.name saknas`);
+  const range = (v: unknown, lo: number, hi: number, label: string) => {
+    if (v === undefined || v === null || v === "") return null;
+    if (!(isNum(v) && v >= lo && v <= hi)) { errors.push(`${at}.${label} måste vara ${lo}–${hi} eller tomt`); return null; }
+    return v;
+  };
+  const maxTravelMin = range(body.maxTravelMin, 5, 300, "maxTravelMin");
+  const carCostPerKm = range(body.carCostPerKm, 0, 20, "carCostPerKm");
+  const childFree = range(body.childFreeTransitUnder, 0, 18, "childFreeTransitUnder");
+
+  const sources: { name: string; url: string; kind?: string }[] = [];
+  if (body.sources !== undefined) {
+    if (!Array.isArray(body.sources) || body.sources.length > 60) errors.push(`${at}.sources måste vara en lista med högst 60 källor`);
+    else body.sources.forEach((src, j) => {
+      const url = isObj(src) ? safeUrl(src.url) : null;
+      if (!isObj(src) || !isStr(src.name) || !src.name.trim() || !url) { errors.push(`${at}.sources[${j}] måste ha name och en http(s)-adress`); return; }
+      sources.push({ name: src.name.trim().slice(0, 80), url, ...(isStr(src.kind) && src.kind.trim() ? { kind: src.kind.trim().slice(0, 30) } : {}) });
+    });
+  }
+
+  const tt = isObj(body.transitTicket) ? body.transitTicket : undefined;
+  if (body.transitTicket !== undefined && body.transitTicket !== null && !tt) errors.push(`${at}.transitTicket måste vara {adult, child, note}`);
+  const adult = tt ? range(tt.adult, 0, 2000, "transitTicket.adult") : null, child = tt ? range(tt.child, 0, 2000, "transitTicket.child") : null;
+  if (body.transport !== undefined && !(isObj(body.transport) && optBool(body.transport.car) && optBool(body.transport.transit))) errors.push(`${at}.transport måste vara {car, transit} som sant eller falskt`);
+  if (body.defaultPlaceId !== undefined && body.defaultPlaceId !== null && body.defaultPlaceId !== "" && !(isStr(body.defaultPlaceId) && ID.test(body.defaultPlaceId))) errors.push(`${at}.defaultPlaceId har otillåtna tecken`);
   if (errors.length) return { ok: false, errors };
-  return { ok: true, value: body as unknown as City & { name: string } };
+
+  const tr = isObj(body.transport) ? body.transport : {};
+  return {
+    ok: true,
+    value: {
+      name: (body.name as string).trim().slice(0, 60),
+      ...(isStr(body.origin) && body.origin.trim() ? { origin: body.origin.trim().slice(0, 120) } : {}),
+      defaultPlaceId: isStr(body.defaultPlaceId) && body.defaultPlaceId ? body.defaultPlaceId : null,
+      transport: { car: tr.car !== false, transit: tr.transit !== false },
+      maxTravelMin, carCostPerKm,
+      transitTicket: { adult, child, ...(tt && isStr(tt.note) && tt.note.trim() ? { note: tt.note.trim().slice(0, 200) } : {}) },
+      childFreeTransitUnder: childFree,
+      sources,
+    },
+  };
 }
 
 export interface RatingInput { key: string; city: string; itemId: string; title: string; tags: string[]; verdict: "bra" | "nej" | "besokt"; stars: number | null; runId: string | null; ratedAt: string }

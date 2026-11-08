@@ -4,13 +4,13 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { radiusKmForMinutes } from "@family-hub/logic";
+import { radiusKmForMinutes, slug } from "@family-hub/logic";
 import { Prisma } from "@/generated/prisma/client";
 import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, verifySessionToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { createLimiter } from "@/lib/ratelimit";
-import { isValidId, parseProfile } from "@/lib/validate";
+import { isValidId, parseCity, parseProfile } from "@/lib/validate";
 import { runDirectSearch } from "@/lib/agent/runner";
 import { runKey } from "@/lib/suggest";
 
@@ -111,6 +111,24 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
 }
 
 /** Sparar familjens profil från Familj-sidan. Samma kontroll som importen. */
+/** Sparar en stad. `id` null skapar en ny stad med id av namnet; annars uppdateras den som finns. */
+export async function saveCity(id: string | null, input: unknown): Promise<{ ok: true; id: string } | { ok: false; errors: string[] }> {
+  await requireFamily();
+  if (id !== null && !isValidId(id)) return { ok: false, errors: ["Ogiltigt stads-id."] };
+  const name = typeof input === "object" && input !== null && "name" in input && typeof input.name === "string" ? input.name : "";
+  const cityId = id ?? slug(name);
+  const parsed = parseCity(cityId, input);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  const exists = await db().city.findUnique({ where: { id: cityId }, select: { id: true } });
+  if (id === null && exists) return { ok: false, errors: [`Det finns redan en stad som heter ${cityId}.`] };
+  if (id !== null && !exists) return { ok: false, errors: ["Staden finns inte."] };
+  const { name: cleanName, ...rest } = parsed.value;
+  const data = rest as Prisma.InputJsonValue;
+  await db().city.upsert({ where: { id: cityId }, create: { id: cityId, name: cleanName, data }, update: { name: cleanName, data } });
+  revalidatePath("/", "layout");
+  return { ok: true, id: cityId };
+}
+
 export async function saveProfile(input: unknown): Promise<{ ok: true } | { ok: false; errors: string[] }> {
   await requireFamily();
   const parsed = parseProfile(input);
