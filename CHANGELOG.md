@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Schema för vecka och månad på hemsidan: under Förslag, för sökningar längre än en helg, finns vyn Schema med en huvudaktivitet per ledig dag, alternativ, väder, total kostnad (okända priser markeras) och länk till Planera dagen. Räknas i webbläsaren med `scheduleFor`, utan ny tabell.
 - Ny struktur på Förslag och Familj. Förslag: dagen är rubriken (stort datum med väder), sökningens sammanfattning ligger hopfälld under en rad, det bästa förslaget leder med en stor avgångstavla och resten är rader i stället för rutor. Familj: ett blad med avsnitt i stället för staplade kort, barnets ålder står stort, sovtiderna visas som ett band över dagen och Spara ligger fast längst ned.
 - Ikon och webbmanifest (`/icon.svg`, `/manifest.webmanifest`): sidan får en flikikon och kan läggas på hemskärmen. På Familj-sidan står det att en ledighet utan slutdatum betyder alla vardagar framåt.
 - Familj-sidan på hemsidan (`/familj`): barn, sovtider, lediga dagar och föräldraledighet, vad torsdagskörningen tar fram, budget, behov, intressen, hemstad och platser. "Spara där jag är nu" sparar telefonens position som en plats.

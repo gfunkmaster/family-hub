@@ -3,7 +3,7 @@
  * restid och åldersmatchning, räknat från vald utgångspunkt. Ren logik.
  */
 import {
-  activeDays, slug, ageMonths, autoPlan, nearestFood, packedFor, ageFitFor, dayEntry, familyCost, ratingKey, scoreItem, tagWeightsFrom, tierFor, travelFor,
+  activeDays, schedulePeriod, slug, ageMonths, autoPlan, nearestFood, packedFor, ageFitFor, dayEntry, familyCost, ratingKey, scoreItem, tagWeightsFrom, tierFor, travelFor,
   type Block, type City, type FoodSpot, type Item, type Level, type Mode, type Origin, type PackedFood, type Profile, type Rating, type Tier,
 } from "@family-hub/logic";
 
@@ -91,6 +91,30 @@ export function suggestionsByDay(run: RunView, profile: Profile, city: City, ori
     const all = run.items.filter((it) => dayEntry(it, date)).map((it) => suggestionFor(it, date, run, profile, city, origin, ratings, tw)).filter((s) => passes(s, f)).sort((a, b) => b.score - a.score);
     return { date, weather: run.weather.find((w) => w.date === date) ?? null, top: all.slice(0, perDay), more: Math.max(0, all.length - perDay) };
   });
+}
+
+export interface ScheduleDay { date: string; weather: Weather | null; pick: Suggestion | null; alts: Suggestion[] }
+export interface Schedule { days: ScheduleDay[]; freeDays: number; total: number; unknownCost: boolean }
+
+/**
+ * Schema för en vecka eller månad: en huvudaktivitet per ledig dag, aldrig samma förslag två dagar i rad
+ * eller med bara en dag emellan (`gap`), och inget som inte passar åldern. Dagar utan förslag är vilodagar.
+ */
+export function scheduleFor(run: RunView, profile: Profile, city: City, origin: Origin | null, ratingList: StoredRating[], gap = 2): Schedule {
+  const ratings = Object.fromEntries(ratingList.map((r) => [r.key, r]));
+  const tw = tagWeightsFrom(ratingList);
+  const cache = new Map<string, Suggestion>();
+  const sug = (it: Item, date: string) => {
+    const k = `${it.id}|${date}`;
+    let v = cache.get(k);
+    if (!v) { v = suggestionFor(it, date, run, profile, city, origin, ratings, tw); cache.set(k, v); }
+    return v;
+  };
+  const free = activeDays(run.dates, profile);
+  const plan = schedulePeriod(run.items, free, (it, d) => sug(it, d).score, { gap });
+  const days = plan.map((x) => ({ date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick: x.pick ? sug(x.pick, x.date) : null, alts: x.alts.map((a) => sug(a, x.date)) }));
+  const picks = days.flatMap((d) => (d.pick ? [d.pick] : []));
+  return { days, freeDays: free.length, total: picks.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: picks.some((p) => p.cost.total == null) };
 }
 
 /** Nyckeln som förslag och betyg grupperas på: staden, eller platsen för en sökning var som helst. */
