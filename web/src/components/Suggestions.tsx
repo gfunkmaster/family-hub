@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { readableName, walkingBeatsTransit, type TripSummary } from "@/lib/travel/resrobot";
-import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
+import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Item, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
 import { rate } from "@/app/actions";
+import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
 import { cityFor, rankedSuggestions, suggestionsByDay, type Filters, type RunView, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
@@ -58,6 +59,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
           ))}</div>
         ) : null}
         {!longRun ? run.weather.map((w) => <Clothes key={w.date} weather={w} profile={profile} date={w.date} withDay />) : null}
+        <SourceReportView fetched={run.fetched} registry={city.sources ?? []} items={run.items} />
         <p className="meta">Sökt {new Date(run.createdAt).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" })} · {run.items.length} förslag</p>
       </div>
 
@@ -119,6 +121,23 @@ function Clothes({ weather, profile, date, withDay = false }: { weather: Weather
       <summary>{withDay ? `${dayName(date)}: ` : "Kläder: "}{tips.headline}</summary>
       <ul>{tips.items.map((t) => <li key={t}>{t}</li>)}</ul>
       <p className="meta">Tumregler efter prognosen. Titta på barnet, inte bara på termometern.</p>
+    </details>
+  );
+}
+
+const FETCH_ERROR: Record<string, string> = { url_not_accessible: "nekade eller gick inte att nå", unavailable: "otillgänglig", timeout: "tog för lång tid", too_many_requests: "för många anrop", url_not_allowed: "ej tillåten", max_uses_exceeded: "hämtningsgränsen var nådd" };
+
+function SourceReportView({ fetched, registry, items }: { fetched: { url: string; ok: boolean; error?: string }[]; registry: { name: string; url: string }[]; items: Item[] }) {
+  if (!fetched.length) return null; // körningar utan logg (torsdagskörningen) har ingen rapport
+  const r = buildSourceReport(fetched, registry, items);
+  return (
+    <details className="sourcereport">
+      <summary>Källor: {r.fetched.length} hämtade, {r.failed.length} misslyckades{r.notTried.length ? `, ${r.notTried.length} i registret försöktes inte` : ""}</summary>
+      <p className="meta">Loggen kommer från sökningens verktygssvar, inte från modellens egen redovisning.</p>
+      {r.fetched.length ? <><h4>Hämtade</h4><ul>{r.fetched.map((f) => <li key={f.host}>{f.host}: {f.items ? `${f.items} förslag` : "inga förslag"}</li>)}</ul></> : null}
+      {r.failed.length ? <><h4>Misslyckades</h4><ul>{r.failed.map((f) => <li key={f.host}>{f.host}: {FETCH_ERROR[f.error] ?? f.error}</li>)}</ul></> : null}
+      {r.notTried.length ? <><h4>Finns i registret men hämtades inte</h4><ul>{r.notTried.map((n) => <li key={n.url}>{n.name}</li>)}</ul></> : null}
+      {r.noItems.length ? <p className="meta">Hämtades men gav inga förslag: {r.noItems.map((n) => n.name).join(", ")}.</p> : null}
     </details>
   );
 }

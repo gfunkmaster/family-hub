@@ -21,6 +21,8 @@ export interface RunView {
   from: string; to: string; kind: string; dates: string[];
   summary: string; createdAt: string; weather: Weather[]; items: Item[];
   food: FoodSpot[]; packed: PackedFood[];
+  /** Sidor som direktsökningen hämtade. Tom för körningar utan logg (torsdagskörningen). */
+  fetched: { url: string; ok: boolean; error?: string }[];
   origin: Origin | null;
 }
 

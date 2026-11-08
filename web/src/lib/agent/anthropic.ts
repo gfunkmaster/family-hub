@@ -3,7 +3,7 @@
  * Ingen SDK: ett enda POST-anrop per varv. `pause_turn` betyder att en lång sökning pausats;
  * då skickas svaret tillbaka oförändrat och Claude fortsätter.
  */
-import { emptyUsage, type LlmProvider, type LlmResult, type LlmUsage, type ResearchInput } from "./types.ts";
+import { emptyUsage, type FetchLog, type LlmProvider, type LlmResult, type LlmUsage, type ResearchInput } from "./types.ts";
 
 type Block = { type: string; text?: string; [k: string]: unknown };
 interface MessagesResponse {
@@ -36,6 +36,19 @@ function addUsage(total: LlmUsage, u: MessagesResponse["usage"]): void {
   total.webFetches += u.server_tool_use?.web_fetch_requests ?? 0;
 }
 
+/** Plockar ut vilka sidor som hämtades (och vilka som nekades) ur verktygssvaren i ett svar. */
+export function fetchLogFrom(content: Block[]): FetchLog[] {
+  const out: FetchLog[] = [];
+  for (const b of content) {
+    if (b.type !== "web_fetch_tool_result") continue;
+    const c = b.content as { type?: string; url?: string; error_code?: string } | undefined;
+    if (!c) continue;
+    if (c.type === "web_fetch_tool_result_error") out.push({ url: typeof c.url === "string" ? c.url : "", ok: false, error: c.error_code ?? "okänt fel" });
+    else if (typeof c.url === "string") out.push({ url: c.url, ok: true });
+  }
+  return out;
+}
+
 export class AnthropicError extends Error {
   readonly status: number;
   readonly usage: LlmUsage;
@@ -55,6 +68,7 @@ export function createAnthropicProvider(opts: AnthropicOptions): LlmProvider {
       ];
       const messages: { role: "user" | "assistant"; content: string | Block[] }[] = [{ role: "user", content: input.prompt }];
       const usage = emptyUsage();
+      const fetched: FetchLog[] = [];
       for (let turn = 0; turn <= maxContinuations; turn++) {
         const res = await doFetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -65,9 +79,10 @@ export function createAnthropicProvider(opts: AnthropicOptions): LlmProvider {
         const body = (await res.json().catch(() => null)) as (MessagesResponse & { error?: { message?: string } }) | null;
         if (!res.ok || !body) throw new AnthropicError(`Claude API svarade ${res.status}: ${body?.error?.message ?? "okänt fel"}`, res.status, usage);
         addUsage(usage, body.usage);
+        fetched.push(...fetchLogFrom(body.content));
         if (body.stop_reason === "pause_turn") { messages.push({ role: "assistant", content: body.content }); continue; }
         const text = body.content.filter((b) => b.type === "text" && typeof b.text === "string").map((b) => b.text).join("");
-        return { text, usage, model: body.model ?? opts.model, stopReason: body.stop_reason };
+        return { text, fetched, usage, model: body.model ?? opts.model, stopReason: body.stop_reason };
       }
       throw new AnthropicError(`Sökningen pausades fler än ${maxContinuations} gånger`, 0, usage);
     },

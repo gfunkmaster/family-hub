@@ -18,8 +18,12 @@ export interface ResearchInput {
   location?: { city?: string; country: string; timezone: string };
 }
 
+/** En sida som agenten försökte hämta, enligt API:ets verktygssvar. */
+export interface FetchLog { url: string; ok: boolean; error?: string }
+
 export interface LlmResult {
   text: string;
+  fetched: FetchLog[];
   usage: LlmUsage;
   model: string;
   stopReason: string;

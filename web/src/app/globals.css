@@ -160,3 +160,6 @@ fieldset legend{font-weight:600;margin-bottom:.25rem}
 .clothes{background:var(--sun-bg);border-radius:10px;padding:8px 12px}
 .clothes ul{margin:6px 0 6px 18px;padding:0;font-size:15px}
 .clothes li{margin:2px 0}
+.sourcereport{background:var(--soft);border-radius:10px;padding:8px 12px}
+.sourcereport h4{margin:8px 0 2px;font-size:15px}
+.sourcereport ul{margin:2px 0 6px 18px;padding:0;font-size:15px}

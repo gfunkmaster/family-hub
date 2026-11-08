@@ -66,6 +66,7 @@ Hemsidans tabeller har några fält till, som artifacten saknar:
   - `food [FoodSpot]`: matställen nära förslagen. `{id, title, venue?, lat?, lng?, near [item-id], highChair, microwave, changing ("ja"|"nej"|"oklart"), priceNote?, hoursNote?, note?, sources [{title, url}]}`. Minst en källa.
   - `packed [PackedFood]`: matlådor att ta med. `{id, title, fromMonths, toMonths?, ingredients [text], steps [text], keeps?, note?, sources}`. Minst en källa ska ligga på livsmedelsverket.se.
 - **Request:** `cityId` eller `place`, `radiusKm`, `mode` (`"direkt"` sidan söker själv, `"kö"` torsdagskörningen), `status` (`"ny"|"pågår"|"klar"|"fel"`) och `error` (varför den inte gick).
+- **Run.fetched:** `[{url, ok, error?}]`. Sidor som direktsökningen hämtade, ur Claude API:ets verktygssvar (inte modellens egen redovisning). Tom för körningar utan logg, som torsdagskörningen. Förslag-sidan jämför loggen med stadens källregister och visar vilka källor som hämtades, misslyckades, inte försöktes eller inte gav förslag (`web/src/lib/sourceReport.ts`).
 - **AgentUsage:** en rad per direktsökning: `requestId, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, webSearches, webFetches, costUsd, createdAt`. Månadens summa styr budgettaket.
 
 ## I webbläsaren

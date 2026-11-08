@@ -44,6 +44,8 @@ model Run {
   items     Json
   food      Json     @default("[]")
   packed    Json     @default("[]")
+  /// Sidor som agenten hämtade, från verktygssvaren: [{url, ok, error?}]. Tom för körningar utan logg.
+  fetched   Json     @default("[]")
   createdAt DateTime
   updatedAt DateTime @updatedAt
 
