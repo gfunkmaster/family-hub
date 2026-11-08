@@ -26,6 +26,8 @@ På hemsidan skrivs profilen från Familj-sidan (`/familj`). Den går genom `par
 
 `name`, `origin` (text), `defaultPlaceId`, `transport {car, transit}`, `maxTravelMin`, `carCostPerKm`, `transitTicket {adult, child, note}`, `childFreeTransitUnder` (år), `sources [{name, url, kind}]` (källregistret).
 
+På hemsidan skrivs staden från Städer-sidan (`/stader`). Den går genom `parseCity`, som tar bort okända fält, kräver rimliga tal (restidsgräns 5–300 min, bilkostnad 0–20 kr/km, biljetter 0–2000 kr, gratis under 0–18 år) och en http(s)-adress på varje källa. Ett värde som saknas sparas som `null`, aldrig som 0.
+
 ## `runs/<stad>-<från>`
 
 En körning för en period.

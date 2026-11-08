@@ -104,3 +104,23 @@ test("profil: fel som Familj-sidan kan skicka avvisas", () => {
   assert.match(bad({ places: [{ id: "a", name: "A" }, { id: "a", name: "B" }] }).join(), /dubbla id/);
   assert.match(bad({ autoRun: "dag" }).join(), /autoRun/);
 });
+
+test("stad: okända fält tas bort och orimliga värden avvisas", () => {
+  const ok = parseCity("stockholm", { name: " Stockholm ", origin: "T-Centralen", transport: { car: true, transit: false }, maxTravelMin: 45, carCostPerKm: 2.5, transitTicket: { adult: 43, child: null, hack: 1 }, childFreeTransitUnder: 12, sources: [{ name: "Kulturhuset", url: "https://kulturhusetstadsteatern.se", kind: "evenemang" }], hack: true });
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  if (ok.ok) {
+    assert.equal(ok.value.name, "Stockholm");
+    assert.equal("hack" in ok.value, false);
+    assert.deepEqual(ok.value.transport, { car: true, transit: false });
+    assert.deepEqual(ok.value.transitTicket, { adult: 43, child: null });
+    assert.equal(ok.value.sources?.[0]?.kind, "evenemang");
+  }
+  const defaults = parseCity("vaxjo", { name: "Växjö" });
+  assert.equal(defaults.ok && defaults.value.transport?.car, true, "okänt transportsätt räknas som möjligt");
+  assert.equal(defaults.ok && defaults.value.maxTravelMin, null, "okänd gräns förblir okänd");
+  assert.equal(parseCity("x", { name: "X", maxTravelMin: 2 }).ok, false);
+  assert.equal(parseCity("x", { name: "X", carCostPerKm: -1 }).ok, false);
+  assert.equal(parseCity("x", { name: "X", transitTicket: { adult: "gratis" } }).ok, false);
+  assert.equal(parseCity("x", { name: "X", sources: [{ name: "", url: "https://x.se" }] }).ok, false);
+  assert.equal(parseCity("x", { name: "X", defaultPlaceId: "../x" }).ok, false);
+});

@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Städer-sidan (`/stader`): redigera stadens utgångspunkt, standardplats, bil och kollektivt, längsta restid, bilkostnad, biljettpriser, gratis resor för barn och källregistret, eller skapa en ny stad. `parseCity` tar nu bort okända fält och avvisar orimliga värden (även vid import). Okända värden förblir tomma och visas som okända.
 - Schema för vecka och månad på hemsidan: under Förslag, för sökningar längre än en helg, finns vyn Schema med en huvudaktivitet per ledig dag, alternativ, väder, total kostnad (okända priser markeras) och länk till Planera dagen. Räknas i webbläsaren med `scheduleFor`, utan ny tabell.
 - Ny struktur på Förslag och Familj. Förslag: dagen är rubriken (stort datum med väder), sökningens sammanfattning ligger hopfälld under en rad, det bästa förslaget leder med en stor avgångstavla och resten är rader i stället för rutor. Familj: ett blad med avsnitt i stället för staplade kort, barnets ålder står stort, sovtiderna visas som ett band över dagen och Spara ligger fast längst ned.
 - Ikon och webbmanifest (`/icon.svg`, `/manifest.webmanifest`): sidan får en flikikon och kan läggas på hemskärmen. På Familj-sidan står det att en ledighet utan slutdatum betyder alla vardagar framåt.

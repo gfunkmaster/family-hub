@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
 
-export function Nav({ current }: { current: "forslag" | "bestall" | "plan" | "familj" }) {
+export function Nav({ current }: { current: "forslag" | "bestall" | "plan" | "familj" | "stader" }) {
   return (
     <>
       <header className="top">
@@ -14,6 +14,7 @@ export function Nav({ current }: { current: "forslag" | "bestall" | "plan" | "fa
         <Link href="/" aria-current={current === "forslag" ? "page" : undefined}>Förslag</Link>
         <Link href="/bestall" aria-current={current === "bestall" ? "page" : undefined}>Beställ</Link>
         <Link href="/familj" aria-current={current === "familj" ? "page" : undefined}>Familj</Link>
+        <Link href="/stader" aria-current={current === "stader" ? "page" : undefined}>Städer</Link>
       </nav>
     </>
   );
