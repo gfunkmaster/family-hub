@@ -2,6 +2,8 @@
 
 ## Ej släppt
 
+- PNG-ikoner (192, 512 och Apple touch 180) så att sidan får rätt ikon på iPhone och Android när den läggs på hemskärmen. Ikonerna når inloggningssidan utan inloggning.
+- Beställ: radioknapparna under Var bröts upp i smala kolumner (`width: 100%` gällde även radioknappar), och statusmärket ("Klar") blev en rund bubbla när raden hade två rader text. Länkar i märken är inte längre understrukna.
 - Städer-sidan (`/stader`): redigera stadens utgångspunkt, standardplats, bil och kollektivt, längsta restid, bilkostnad, biljettpriser, gratis resor för barn och källregistret, eller skapa en ny stad. `parseCity` tar nu bort okända fält och avvisar orimliga värden (även vid import). Okända värden förblir tomma och visas som okända.
 - Schema för vecka och månad på hemsidan: under Förslag, för sökningar längre än en helg, finns vyn Schema med en huvudaktivitet per ledig dag, alternativ, väder, total kostnad (okända priser markeras) och länk till Planera dagen. Räknas i webbläsaren med `scheduleFor`, utan ny tabell.
 - Ny struktur på Förslag och Familj. Förslag: dagen är rubriken (stort datum med väder), sökningens sammanfattning ligger hopfälld under en rad, det bästa förslaget leder med en stor avgångstavla och resten är rader i stället för rutor. Familj: ett blad med avsnitt i stället för staplade kort, barnets ålder står stort, sovtiderna visas som ett band över dagen och Spara ligger fast längst ned.

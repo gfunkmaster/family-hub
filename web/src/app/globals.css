@@ -94,7 +94,7 @@ button:disabled{opacity:.55;cursor:default}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 label{font-size:14px;color:var(--muted);display:grid;gap:4px}
 input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
-input[type="checkbox"]{width:auto}
+input[type="checkbox"],input[type="radio"]{width:auto}
 .check{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .sources{font-size:14px;display:flex;flex-wrap:wrap;gap:4px 12px}
@@ -130,7 +130,7 @@ fieldset legend{font-weight:600;margin-bottom:.25rem}
 
 /* Pekskärm (mobil och iPad): minst 44 px att trycka på */
 @media (pointer:coarse){
-  button,.btn,nav.tabs a,select,input:not([type="checkbox"]){min-height:44px}
+  button,.btn,nav.tabs a,select,input:not([type="checkbox"]):not([type="radio"]){min-height:44px}
   button.small,.btn.small{min-height:40px}
 }
 
@@ -217,3 +217,6 @@ fieldset legend{font-weight:600;margin-bottom:.25rem}
 @media (min-width:768px){
   .srow{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr) auto;align-items:end}
 }
+
+.chip{align-self:center}
+a.chip{text-decoration:none}

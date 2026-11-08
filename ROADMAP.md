@@ -43,7 +43,7 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 23. **Familj-sidan.** Klar (`/familj`).
 24. **Schema för vecka och månad.** Vyn Schema finns under Förslag. Kvar: att spara ett schema, och att välja flera förslag till samma dag (`/plan` tar redan upp till fyra `item`).
 25. **Städer och källor.** Klar (`/stader`).
-26. **Installera som app.** Manifest och SVG-ikon finns. Kvar: PNG-ikoner (192, 512 och Apple touch) för bästa stöd på iPhone.
+26. **Installera som app.** Klar: manifest, SVG-ikon och PNG-ikoner.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.
 28. **Fler leverantörer för direktsökning.** DeepSeek eller liknande via `LlmProvider`. Kräver en egen sökmotor (t.ex. Brave Search API), eftersom de saknar inbyggd webbsökning.
 29. **Geokodning på servern.** En adress eller ort utan koordinater får nu sina koordinater av agenten. En geokodare på servern ger restid redan innan sökningen.
