@@ -2,6 +2,9 @@
 
 ## Ej släppt
 
+- Familj-sidan på hemsidan (`/familj`): barn, sovtider, lediga dagar och föräldraledighet, vad torsdagskörningen tar fram, budget, behov, intressen, hemstad och platser. "Spara där jag är nu" sparar telefonens position som en plats.
+- Profilen kontrolleras och rensas på servern (samma kontroll vid import): rimliga tal, giltiga tider och koordinater, inga okända fält.
+- Källrapport per direktsökning: Förslag visar vilka sidor sökningen faktiskt hämtade, vilka som misslyckades, vilka av stadens källor som inte försöktes och vilka som inte gav förslag. Loggen kommer från verktygssvaren i Claude API:et och sparas i `Run.fetched` (migrering `0003_kallogg`).
 - Beroenden är låsta: `package-lock.json` är committad, och CI och Dockerfile kör `npm ci` i stället för `npm install`.
 - Hårdare drift: inloggningen spärras efter 5 felaktiga lösenord per IP-adress och kvart (`web/src/lib/ratelimit.ts`), och `lokalt.sh` skapar längre lösenord.
 - Direktsökningar som fastnat på "pågår" i mer än 20 minuter (till exempel när maskinen startats om) sätts till "fel" med en förklaring i stället för att visa "Söker…" för evigt.

@@ -1,5 +1,6 @@
 import "server-only";
 import { datesBetween, slug, type City, type Profile } from "@family-hub/logic";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { runData } from "@/lib/persist";
 import { parseRun, type PlaceInput } from "@/lib/validate";
@@ -119,7 +120,7 @@ export async function runDirectSearch(requestId: string, provider: LlmProvider |
   if (!parsed.ok) { await fail(`Svaret klarade inte kontrollen: ${parsed.errors.slice(0, 3).join("; ")}${parsed.errors.length > 3 ? ` (+${parsed.errors.length - 3} till)` : ""}`); return; }
 
   const runId = `${slug(req.city?.id ?? runPlace?.name ?? "plats")}-${req.from}-${requestId.slice(-6)}`;
-  const data = runData(parsed.value);
+  const data = { ...runData(parsed.value), fetched: result.fetched as unknown as Prisma.InputJsonValue };
   await prisma.run.upsert({ where: { id: runId }, create: { id: runId, ...data }, update: data });
   await prisma.request.update({ where: { id: requestId }, data: { status: "klar", runId, error: null } });
 }

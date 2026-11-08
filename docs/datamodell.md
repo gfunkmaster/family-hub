@@ -20,6 +20,8 @@ Regler: alla inloggade som appen delas med kan läsa, och bara ägaren skriver (
 | `autoRun` | `"helg" \| "vecka" \| "ingen"` | Vad torsdagskörningen tar fram utan beställning |
 | `places` | `{id, name, address, city, lat?, lng?, geoNote?}[]` | Utgångspunkter för restid |
 
+På hemsidan skrivs profilen från Familj-sidan (`/familj`). Den går genom `parseProfile`, som tar bort okända fält och kräver giltiga tider (`to` efter `from`) och koordinater (både `lat` och `lng`, eller ingen).
+
 ## `cities/<id>`
 
 `name`, `origin` (text), `defaultPlaceId`, `transport {car, transit}`, `maxTravelMin`, `carCostPerKm`, `transitTicket {adult, child, note}`, `childFreeTransitUnder` (år), `sources [{name, url, kind}]` (källregistret).
@@ -64,6 +66,7 @@ Hemsidans tabeller har några fält till, som artifacten saknar:
   - `food [FoodSpot]`: matställen nära förslagen. `{id, title, venue?, lat?, lng?, near [item-id], highChair, microwave, changing ("ja"|"nej"|"oklart"), priceNote?, hoursNote?, note?, sources [{title, url}]}`. Minst en källa.
   - `packed [PackedFood]`: matlådor att ta med. `{id, title, fromMonths, toMonths?, ingredients [text], steps [text], keeps?, note?, sources}`. Minst en källa ska ligga på livsmedelsverket.se.
 - **Request:** `cityId` eller `place`, `radiusKm`, `mode` (`"direkt"` sidan söker själv, `"kö"` torsdagskörningen), `status` (`"ny"|"pågår"|"klar"|"fel"`) och `error` (varför den inte gick).
+- **Run.fetched:** `[{url, ok, error?}]`. Sidor som direktsökningen hämtade, ur Claude API:ets verktygssvar (inte modellens egen redovisning). Tom för körningar utan logg, som torsdagskörningen. Förslag-sidan jämför loggen med stadens källregister och visar vilka källor som hämtades, misslyckades, inte försöktes eller inte gav förslag (`web/src/lib/sourceReport.ts`).
 - **AgentUsage:** en rad per direktsökning: `requestId, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, webSearches, webFetches, costUsd, createdAt`. Månadens summa styr budgettaket.
 
 ## I webbläsaren

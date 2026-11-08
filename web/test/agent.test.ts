@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createAnthropicProvider, AnthropicError } from "../src/lib/agent/anthropic.ts";
+import { createAnthropicProvider, AnthropicError, fetchLogFrom } from "../src/lib/agent/anthropic.ts";
 import { budgetState, costUsd, monthStartStockholm } from "../src/lib/agent/cost.ts";
 import { buildResearchPrompt, extractJson } from "../src/lib/agent/prompt.ts";
 
@@ -98,4 +98,30 @@ test("prompt: stadens källor listas men begränsas till sökområdet", () => {
   assert.match(prompt, /Kända källor för Stockholm\. Använd dem bara för det som ligger inom sökområdet/);
   assert.match(prompt, /- Skansen: https:\/\/www\.skansen\.se\//);
   assert.match(prompt, /Hitta själv de lokala källorna/);
+});
+
+test("anthropic: hämtningslogg ur verktygssvaren, med lyckade och nekade sidor", () => {
+  const log = fetchLogFrom([
+    { type: "text", text: "hej" },
+    { type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://www.skansen.se/kalender/" } },
+    { type: "web_fetch_tool_result", content: { type: "web_fetch_tool_result_error", error_code: "url_not_accessible", url: "https://x.se/" } },
+    { type: "web_fetch_tool_result", content: { type: "web_fetch_tool_result_error", error_code: "unavailable" } },
+    { type: "web_search_tool_result", content: [] },
+  ]);
+  assert.deepEqual(log, [
+    { url: "https://www.skansen.se/kalender/", ok: true },
+    { url: "https://x.se/", ok: false, error: "url_not_accessible" },
+    { url: "", ok: false, error: "unavailable" },
+  ]);
+});
+
+test("anthropic: loggen från alla varv följer med resultatet", async () => {
+  const answers = [
+    { stop_reason: "pause_turn", model: "m", content: [{ type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://a.se/" } }] },
+    { stop_reason: "end_turn", model: "m", content: [{ type: "text", text: "{}" }, { type: "web_fetch_tool_result", content: { type: "web_fetch_tool_result_error", error_code: "timeout", url: "https://b.se/" } }] },
+  ];
+  let n = 0;
+  const fetchImpl = (async () => reply(answers[n++])) as unknown as typeof fetch;
+  const r = await createAnthropicProvider({ apiKey: "k", model: "m", fetchImpl }).research(input);
+  assert.deepEqual(r.fetched, [{ url: "https://a.se/", ok: true }, { url: "https://b.se/", ok: false, error: "timeout" }]);
 });

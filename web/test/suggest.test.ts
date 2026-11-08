@@ -6,7 +6,7 @@ const profile = { adults: 2, children: [{ birthdate: "2026-01-27" }], availabili
 const city = { id: "stockholm", name: "Stockholm", transport: { car: true, transit: true }, maxTravelMin: 45, carCostPerKm: 2.5, transitTicket: { adult: 43 }, childFreeTransitUnder: 12 };
 const weekdays = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"];
 const run: RunView = {
-  id: "stockholm-2026-11-09", city: "stockholm", cityId: "stockholm", label: "Stockholm", place: null, food: [], packed: [], from: "2026-11-09", to: "2026-11-15", kind: "vecka",
+  id: "stockholm-2026-11-09", city: "stockholm", cityId: "stockholm", label: "Stockholm", place: null, food: [], packed: [], fetched: [], from: "2026-11-09", to: "2026-11-15", kind: "vecka",
   dates: [...weekdays, "2026-11-14", "2026-11-15"], summary: "", createdAt: "2026-11-06T14:05:42Z", weather: [], origin: null,
   items: [
     { id: "near", title: "Öppna förskolan", lat: 59.3436, lng: 17.9898, dates: weekdays.map((date) => ({ date, from: "08:30", to: "11:30" })), prices: { adult: 0, child: 0 }, ageFit: { level: "säkert", minMonths: 0 }, travel: { car: { km: 1.5, min: 5 } }, tags: ["lek"] },

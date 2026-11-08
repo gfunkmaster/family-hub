@@ -40,7 +40,7 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 20. **Driftsätt på Fly.io.** Följ [docs/drift.md](docs/drift.md) steg 1–3.
 21. **Flytta data från appen.** Importen i steg 4.
 22. **Byt den schemalagda körningen till sidans API.** Steg 5.
-23. **Familj-sidan.** Barn, sovtider, lediga dagar, budget och sparade platser, med "Spara där jag är nu" via GPS.
+23. **Familj-sidan.** Klar (`/familj`). Kvar: standardplats per stad, som hör till punkt 25.
 24. **Schema för vecka och månad.** Dagsplanen med mat finns (`/plan`). Kvar: schemat för vecka och månad, och att välja flera förslag till samma dag.
 25. **Städer och källor.** Redigera transport, restidsgräns och källregister.
 26. **Installera som app.** Webbmanifest och ikon, så att sidan kan läggas på hemskärmen.

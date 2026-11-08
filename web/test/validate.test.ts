@@ -72,3 +72,35 @@ test("beställning runt en plats", () => {
   assert.equal(parseRequestPatch({ status: "pågår" }).ok, true);
   assert.equal(parseRequestPatch({ status: "fel" }).ok, true);
 });
+
+test("profil från Familj-sidan: rensas och kontrolleras", () => {
+  const r = parseProfile({
+    adults: 2, budgetMax: 400, extra: "tas bort",
+    children: [{ id: "c1", name: " Lavica ", birthdate: "2026-02-01", approx: true }],
+    naps: [{ from: "13:00", to: "14:30" }, { from: "09:30", to: "10:30" }],
+    interests: ["Natur", "natur", " lek "], avoid: [],
+    places: [{ id: "hem", name: "Hemma", address: "Armégatan 11, Solna", city: "stockholm", lat: 59.36, lng: 18.0 }, { id: "vx", address: "Växjö" }],
+    availability: { weekdays: true }, leaveUntil: "", autoRun: "vecka", homeCity: "stockholm",
+  });
+  assert.ok(r.ok, JSON.stringify(r));
+  assert.equal("extra" in r.value, false);
+  assert.equal(r.value.children?.[0]?.name, "Lavica");
+  assert.deepEqual(r.value.naps?.map((n) => n.from), ["09:30", "13:00"]);
+  assert.deepEqual(r.value.interests, ["natur", "lek"]);
+  assert.deepEqual(r.value.availability, { weekdays: true, weekends: true });
+  assert.equal(r.value.leaveUntil, null);
+  assert.equal(r.value.places?.[1]?.lat, undefined);
+});
+
+test("profil: fel som Familj-sidan kan skicka avvisas", () => {
+  const bad = (p: object) => { const r = parseProfile(p); return r.ok ? [] : r.errors; };
+  assert.match(bad({ adults: 0 }).join(), /adults/);
+  assert.match(bad({ budgetMax: -5 }).join(), /budgetMax/);
+  assert.match(bad({ naps: [{ from: "14:00", to: "13:00" }] }).join(), /efter from/);
+  assert.match(bad({ naps: [{ from: "25:00", to: "26:00" }] }).join(), /HH:MM/);
+  assert.match(bad({ places: [{ id: "a", name: "A", lat: 59 }] }).join(), /både lat och lng/);
+  assert.match(bad({ places: [{ id: "a", name: "A", lat: 99, lng: 18 }] }).join(), /giltiga koordinater/);
+  assert.match(bad({ places: [{ id: "a" }] }).join(), /namn eller en adress/);
+  assert.match(bad({ places: [{ id: "a", name: "A" }, { id: "a", name: "B" }] }).join(), /dubbla id/);
+  assert.match(bad({ autoRun: "dag" }).join(), /autoRun/);
+});

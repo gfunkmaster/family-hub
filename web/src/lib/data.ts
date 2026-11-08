@@ -26,6 +26,7 @@ function toRunView(r: Run, cityNames: Map<string, string>): RunView {
     summary: r.summary, createdAt: r.createdAt.toISOString(),
     weather: r.weather as unknown as Weather[], items: r.items as unknown as Item[],
     food: (r.food as unknown as FoodSpot[] | null) ?? [], packed: (r.packed as unknown as PackedFood[] | null) ?? [],
+    fetched: (r.fetched as unknown as RunView["fetched"] | null) ?? [],
     origin: (r.origin as Origin | null) ?? null,
   };
 }
