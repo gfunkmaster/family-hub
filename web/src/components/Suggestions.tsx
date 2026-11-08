@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import type { TripSummary } from "@/lib/travel/resrobot";
 import { fmtPrecip, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Origin, type Profile, type Tier } from "@family-hub/logic";
 import { rate } from "@/app/actions";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
 
   if (!run) return <div className="card empty">Inga förslag ännu. Beställ en helg, vecka eller månad under Beställ.</div>;
 
+  const tripFrom = origin ?? (hasCoords(run.origin) ? { name: run.origin.name ?? "", lat: run.origin.lat, lng: run.origin.lng } : null);
   const longRun = run.dates.length > 2;
   const mode = longRun ? view : "lista";
   const list = mode === "lista" ? rankedSuggestions(run, profile, city, origin, ratings, filters) : [];
@@ -97,16 +99,50 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         ? days.map((d) => (
           <div key={d.date} className="card">
             <div className="row between"><h3>{dayName(d.date)}</h3>{d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}</div>
-            {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
+            {d.top.length ? d.top.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} compact />) : <p className="meta">Inget som passar den här dagen.</p>}
             {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
           </div>
         ))
-        : list.length ? list.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} />) : <div className="card empty">Inget matchar filtret.</div>}
+        : list.length ? list.map((s) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} />) : <div className="card empty">Inget matchar filtret.</div>}
     </section>
   );
 }
 
-function Card({ s, runId, date, compact = false }: { s: Suggestion; runId: string; date: string; compact?: boolean }) {
+function TransitTrip({ from, item, date }: { from: Origin; item: { lat?: number; lng?: number; dates?: { date: string; from?: string }[] }; date: string }) {
+  const [state, setState] = useState<{ status: "idle" | "loading" } | { status: "ok"; trip: TripSummary | null } | { status: "error" }>({ status: "idle" });
+  const { lat, lng } = item;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  const time = item.dates?.find((d) => d.date === date)?.from;
+  const load = async () => {
+    setState({ status: "loading" });
+    const q = new URLSearchParams({ olat: String(from.lat), olng: String(from.lng), dlat: String(lat), dlng: String(lng), date, ...(time && /^\d{2}:\d{2}$/.test(time) ? { time } : {}) });
+    try {
+      const res = await fetch(`/api/travel?${q}`);
+      if (!res.ok) throw new Error();
+      const body = (await res.json()) as { trip: TripSummary | null };
+      setState({ status: "ok", trip: body.trip });
+    } catch { setState({ status: "error" }); }
+  };
+  return (
+    <div className="trip">
+      {state.status === "idle" ? <button className="small" onClick={load}>Visa kollektivresa</button> : null}
+      {state.status === "loading" ? <p className="meta">Hämtar resan…</p> : null}
+      {state.status === "error" ? <p className="meta">Resan kunde inte hämtas just nu. <button className="small" onClick={load}>Försök igen</button></p> : null}
+      {state.status === "ok" && !state.trip ? <p className="meta">Ingen kollektivresa hittades för den tiden (eller ingen hållplats nära).</p> : null}
+      {state.status === "ok" && state.trip ? (
+        <>
+          <p className="meta"><b>{state.trip.departs}–{state.trip.arrives}</b> · {state.trip.totalMin} min · {state.trip.transfers} byten · {state.trip.walkMin} min gång · från {from.name || "vald plats"} (ResRobot)</p>
+          <ol className="legs">{state.trip.legs.map((l, i) => (
+            <li key={i}>{l.kind === "walk" ? `Gå ${l.min} min${l.meters ? ` (${l.meters} m)` : ""} till ${l.to}` : `${l.label}${l.direction ? ` mot ${l.direction}` : ""} från ${l.from} ${l.departs} till ${l.to} ${l.arrives}`}</li>
+          ))}</ol>
+          <p className="meta">Tillgänglighet för barnvagn ingår inte i ResRobots data.</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function Card({ s, runId, date, from, compact = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; compact?: boolean }) {
   const [pending, start] = useTransition();
   const { item: it, cost, fit, travel, tier } = s;
   const vote = (verdict: "bra" | "nej" | "besokt") => start(() => rate({ key: s.key, runId, itemId: it.id, verdict }));
@@ -129,6 +165,7 @@ function Card({ s, runId, date, compact = false }: { s: Suggestion; runId: strin
       </div>
       {!compact && fit.note ? <p className="note">{fit.note}</p> : null}
       {!compact && it.note ? <p className="note">{it.note}</p> : null}
+      {from ? <TransitTrip from={from} item={it} date={date} /> : null}
       {it.conflict ? <p className="flag"><b>Källorna säger olika:</b> {it.conflict}</p> : null}
       {!compact ? (
         <p className="meta">Vagn: {it.practical?.stroller ?? "oklart"} · Skötrum: {it.practical?.changing ?? "oklart"}{cost.unknown.length ? ` · Okänt: ${cost.unknown.join(", ")}` : ""}{travel?.basis ? ` · Restid ${travel.basis}` : ""}</p>

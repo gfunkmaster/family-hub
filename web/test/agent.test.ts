@@ -74,3 +74,22 @@ test("prompten: plats, radie, barnens ålder, betyg och mat", () => {
   assert.match(prompt, /"packed"/);
   assert.doesNotMatch(prompt, /\n\n\n/);
 });
+
+test("prompt: lokala källor efterfrågas även när sökningen görs runt en plats utan stad", () => {
+  const { prompt } = buildResearchPrompt({
+    profile: {}, city: null, liked: [], disliked: [], recentlyVisited: [], today: "2026-11-08",
+    request: { from: "2026-11-14", to: "2026-11-15", kind: "helg", note: "", cityName: null, place: { name: "Hägersten", lat: 59.29, lng: 18.0 }, radiusKm: 8 },
+  });
+  assert.match(prompt, /Hitta själv de lokala källorna/);
+  assert.doesNotMatch(prompt, /Kända källor/);
+});
+
+test("prompt: stadens källor listas men begränsas till sökområdet", () => {
+  const { prompt } = buildResearchPrompt({
+    profile: {}, city: { name: "Stockholm", sources: [{ name: "Skansen", url: "https://www.skansen.se/" }] }, liked: [], disliked: [], recentlyVisited: [], today: "2026-11-08",
+    request: { from: "2026-11-14", to: "2026-11-14", kind: "helg", note: "", cityName: "Stockholm", place: null, radiusKm: 5 },
+  });
+  assert.match(prompt, /Kända källor för Stockholm\. Använd dem bara för det som ligger inom sökområdet/);
+  assert.match(prompt, /- Skansen: https:\/\/www\.skansen\.se\//);
+  assert.match(prompt, /Hitta själv de lokala källorna/);
+});
