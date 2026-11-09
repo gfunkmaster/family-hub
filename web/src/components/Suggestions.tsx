@@ -6,7 +6,8 @@ import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, s
 import { rate } from "@/app/actions";
 import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
-import { cityFor, rankedSuggestions, scheduleFor, suggestionsByDay, type Filters, type RunView, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
+import { calendarUrl, mapsUrl } from "@/lib/links";
+import { cityFor, rankedSuggestions, runIsPast, scheduleFor, suggestionsByDay, withoutPastDays, type Filters, type PeriodRef, type RunView, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
 
 type CityRow = City & { id: string; name: string };
@@ -21,15 +22,19 @@ const kr = (n: number | null) => (n == null ? "?" : `${n.toLocaleString("sv-SE")
 const MODE: Record<string, string> = { walk: "Gång", transit: "Kollektivt", car: "Bil" };
 const levelClass = (l: string) => (l === "säkert" ? "good" : l === "troligt" ? "" : l === "oklart" ? "warn" : "bad");
 
-export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[]; cities: CityRow[]; profile: Profile; ratings: StoredRating[] }) {
+export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: { runs: RunView[]; allRuns: PeriodRef[]; today: string; cities: CityRow[]; profile: Profile; ratings: StoredRating[] }) {
   const [cityId, setCityId] = useState(runs[0]?.city ?? "");
   const [filters, setFilters] = useState<Filters>({ tier: "alla", ageOnly: false });
   const [view, setView] = useState<"dag" | "lista" | "schema">("dag");
   const [originChoice, setOriginChoice] = useState<string>("auto");
   const geo = useGeolocation();
 
-  const run = runs.find((r) => r.city === cityId) ?? runs[0];
-  const city: CityRow = run ? cityFor(run, cities) : { id: "", name: "" };
+  const fullRun = runs.find((r) => r.city === cityId) ?? runs[0];
+  // Passerade dagar visas inte. En helt passerad körning visas som den är, med en notis.
+  const run = fullRun ? withoutPastDays(fullRun, today) : undefined;
+  const past = run ? runIsPast(run, today) : false;
+  const siblings = run ? allRuns.filter((r) => r.city === run.city).sort((a, b) => a.from.localeCompare(b.from) || b.createdAt.localeCompare(a.createdAt)) : [];
+  const city: CityRow = fullRun ? cityFor(fullRun, cities) : { id: "", name: "" };
   const places = (profile.places ?? []).filter(hasCoords);
 
   const origin: Origin | null = useMemo(() => {
@@ -54,6 +59,20 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         <div className="row">{runs.map((r) => (
           <button key={r.id} className="small" aria-pressed={r.city === run.city} onClick={() => setCityId(r.city)}>{r.label}</button>
         ))}</div>
+      ) : null}
+
+      {siblings.length > 1 ? (
+        <nav className="row periods" aria-label="Perioder">
+          {siblings.map((r) => (
+            <Link key={r.id} className="btn small" aria-current={r.id === run.id ? "page" : undefined} href={`/?run=${encodeURIComponent(r.id)}`}>
+              {r.from === r.to ? dayName(r.from) : `${dayName(r.from)} – ${dayName(r.to)}`}{runIsPast(r, today) ? " (passerad)" : ""}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {past ? (
+        <div className="card note" role="status">Den här perioden har passerat. <Link href="/bestall">Beställ en ny sökning</Link>{siblings.some((r) => !runIsPast(r, today)) ? " eller välj en annan period ovan" : ""}.</div>
       ) : null}
 
       <header className="runhead">
@@ -117,7 +136,7 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
         </div>
       ) : null}
 
-      {mode === "schema" && schedule ? <ScheduleView schedule={schedule} runId={run.id} /> : null}
+      {mode === "schema" && schedule ? <ScheduleView schedule={schedule} runId={run.id} past={past} /> : null}
 
       {mode === "schema" ? null : mode === "dag"
         ? days.map((d) => {
@@ -130,17 +149,17 @@ export function Suggestions({ runs, cities, profile, ratings }: { runs: RunView[
                 {d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}
               </div>
               <Clothes weather={d.weather} profile={profile} date={d.date} />
-              {d.top.length ? d.top.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} compact lead={i === 0} plain={i > 0} />) : <p className="meta">Inget som passar den här dagen.</p>}
+              {d.top.length ? d.top.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} area={run.label} past={past} compact lead={i === 0} plain={i > 0} />) : <p className="meta">Inget som passar den här dagen.</p>}
               {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
             </section>
           );
         })
-        : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
+        : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} area={run.label} past={past} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
     </section>
   );
 }
 
-function ScheduleView({ schedule, runId }: { schedule: Schedule; runId: string }) {
+function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: string; past: boolean }) {
   if (!schedule.freeDays) {
     return <div className="card empty">Inga lediga dagar i perioden. Är du föräldraledig? Slå på vardagar under <Link href="/familj">Familj</Link>.</div>;
   }
@@ -166,7 +185,7 @@ function ScheduleView({ schedule, runId }: { schedule: Schedule; runId: string }
                 <h3>{it.title}</h3>
                 <p className="meta">{[time, it.venue, d.pick.travel?.min != null ? `${MODE[d.pick.travel.mode] ?? ""}${d.pick.travel.estimated ? " ca" : ""} ${d.pick.travel.min} min` : null, d.pick.cost.total != null ? kr(d.pick.cost.total) : "pris okänt"].filter(Boolean).join(", ")}</p>
                 {d.alts.length ? <p className="meta">Annars: {d.alts.map((a) => a.item.title).join(", ")}</p> : null}
-                <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link></div>
+                {past ? null : <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link></div>}
               </div>
             ) : <p className="meta">Inget förslag den här dagen. En vilodag.</p>}
           </div>
@@ -254,12 +273,21 @@ function TransitTrip({ from, item, date }: { from: Origin; item: { title?: strin
   );
 }
 
-function Card({ s, runId, date, from, compact = false, lead = false, plain = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; compact?: boolean; lead?: boolean; plain?: boolean }) {
+function Card({ s, runId, date, from, area, past = false, compact = false, lead = false, plain = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; area?: string; past?: boolean; compact?: boolean; lead?: boolean; plain?: boolean }) {
   const [pending, start] = useTransition();
   const { item: it, cost, fit, travel, tier } = s;
   const vote = (verdict: "bra" | "nej" | "besokt") => start(() => rate({ key: s.key, runId, itemId: it.id, verdict }));
   const travelTxt = travel ? `${MODE[travel.mode] ?? ""}${travel.min != null ? `${travel.estimated ? " ca" : ""} ${travel.min} min` : ""}${travel.withinLimit === false ? " (över er gräns)" : ""}` : "Restid okänd";
   const costTxt = cost.total != null ? `Totalt ${kr(cost.total)}` : `Entré ${kr(cost.entry)}${cost.travel != null ? ` + resa ${kr(cost.travel)}` : ""}`;
+  const map = mapsUrl(it, area);
+  const entry = it.dates?.find((d) => d.date === date);
+  // Ett evenemang får sina tider. En plats har öppettider, inte en besökstid, så den blir en heldagshändelse.
+  const cal = past ? null : calendarUrl({
+    title: it.title, date,
+    ...(it.kind === "event" && entry?.from ? { start: entry.from, end: entry.to, durationMin: it.durationMin } : {}),
+    location: it.venue,
+    details: [entry?.from && it.kind !== "event" ? `Öppet ${entry.from}–${entry.to ?? ""}` : null, it.note, it.sources?.[0]?.url].filter(Boolean).join("\n"),
+  });
   const when = (it.dates ?? []).filter((d) => !compact || d.date === s.date).map((d) => `${dayName(d.date)} ${d.from ?? ""}–${d.to ?? ""}`).join(" · ");
   return (
     <article className={`card item ${it.conflict ? "conflict" : it.verified ? "verified" : ""}${lead ? " lead" : ""}${plain ? " plain" : ""}`}>
@@ -295,8 +323,14 @@ function Card({ s, runId, date, from, compact = false, lead = false, plain = fal
         <button className="small" disabled={pending} aria-pressed={s.verdict === "bra"} onClick={() => vote("bra")}>Bra förslag</button>
         <button className="small" disabled={pending} aria-pressed={s.verdict === "nej"} onClick={() => vote("nej")}>Inte för oss</button>
         <button className="small" disabled={pending} aria-pressed={s.verdict === "besokt"} onClick={() => vote("besokt")}>Vi var där</button>
-        <Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link>
+        {past ? null : <Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link>}
       </div>
+      {map || cal ? (
+        <div className="row">
+          {map ? <a className="btn small" href={map} target="_blank" rel="noopener noreferrer">Öppna i Kartor</a> : null}
+          {cal ? <a className="btn small" href={cal} target="_blank" rel="noopener noreferrer">Lägg i kalendern</a> : null}
+        </div>
+      ) : null}
       </div>
     </article>
   );

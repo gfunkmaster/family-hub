@@ -2,6 +2,9 @@
 
 ## Ej släppt
 
+- Förslag öppnar på rätt period: för varje stad visas sökningen som täcker idag, annars den närmast kommande, annars den senast passerade (`pickRun`). Tidigare visades den senast skapade, så en sökning för om två veckor kunde skymma veckans. När en stad har flera sökningar finns en rad med perioderna att växla mellan.
+- Passerade dagar visas inte längre: datum, väder och förslag före idag tas bort (`withoutPastDays`), även i listan och schemat. En helt passerad sökning visas med en notis och länk till Beställ, utan Planera dagen. Dagsplanen säger till om dagen har passerat. "Idag" räknas i svensk tid på servern.
+- "Öppna i Kartor" och "Lägg i kalendern" på varje förslag och på aktiviteterna i dagsplanen (`web/src/lib/links.ts`). Kartlänken använder koordinater, annars plats och stad. Kalenderlänken öppnar ett ifyllt utkast i Google Kalender i svensk tid, utan API: evenemang får sina tider, platser blir heldag med öppettiderna i beskrivningen, och i dagsplanen används planens tid (eller evenemangets egen).
 - PNG-ikoner (192, 512 och Apple touch 180) så att sidan får rätt ikon på iPhone och Android när den läggs på hemskärmen. Ikonerna når inloggningssidan utan inloggning.
 - Beställ: radioknapparna under Var bröts upp i smala kolumner (`width: 100%` gällde även radioknappar), och statusmärket ("Klar") blev en rund bubbla när raden hade två rader text. Länkar i märken är inte längre understrukna.
 - Städer-sidan (`/stader`): redigera stadens utgångspunkt, standardplats, bil och kollektivt, längsta restid, bilkostnad, biljettpriser, gratis resor för barn och källregistret, eller skapa en ny stad. `parseCity` tar nu bort okända fält och avvisar orimliga värden (även vid import). Okända värden förblir tomma och visas som okända.

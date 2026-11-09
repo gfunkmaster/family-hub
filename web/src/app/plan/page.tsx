@@ -3,6 +3,7 @@ import { Nav } from "@/components/Nav";
 import { DayPlanView } from "@/components/DayPlanView";
 import { getCities, getProfile, getRun } from "@/lib/data";
 import { isValidId } from "@/lib/validate";
+import { stockholmToday } from "@/lib/suggest";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function Plan({ searchParams }: { searchParams: Promise<{ r
     <main className="wrap">
       <Nav current="plan" />
       {run && date && items.length
-        ? <DayPlanView run={run} cities={cities} profile={profile} date={date} itemIds={items} />
+        ? <DayPlanView run={run} cities={cities} profile={profile} date={date} today={stockholmToday(new Date())} itemIds={items} />
         : <div className="card empty">Välj ett förslag och tryck på Planera dagen. <Link href="/">Till förslagen</Link></div>}
     </main>
   );

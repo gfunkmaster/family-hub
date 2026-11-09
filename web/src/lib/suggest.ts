@@ -75,8 +75,10 @@ function passes(s: Suggestion, f: Filters): boolean {
 export function rankedSuggestions(run: RunView, profile: Profile, city: City, origin: Origin | null, ratingList: StoredRating[], f: Filters): Suggestion[] {
   const ratings = Object.fromEntries(ratingList.map((r) => [r.key, r]));
   const tw = tagWeightsFrom(ratingList);
+  // Ett förslag med datum, men inget av dem i perioden, visas inte: det finns ingen dag att planera eller lägga i kalendern.
   return run.items
-    .map((it) => suggestionFor(it, (it.dates ?? []).find((d) => run.dates.includes(d.date))?.date ?? run.from, run, profile, city, origin, ratings, tw))
+    .filter((it) => !it.dates?.length || it.dates.some((d) => run.dates.includes(d.date)))
+    .map((it) => suggestionFor(it, (it.dates ?? []).find((d) => run.dates.includes(d.date))?.date ?? run.dates[0] ?? run.from, run, profile, city, origin, ratings, tw))
     .filter((s) => passes(s, f))
     .sort((a, b) => b.score - a.score);
 }
@@ -147,4 +149,57 @@ export function dayPlanFor(run: RunView, profile: Profile, city: City, origin: O
     return { ...b, meal: { near, nearTitle: anchor?.title ?? null, packed } };
   });
   return { date, blocks, items, missing, youngestMonths: youngest };
+}
+
+/** Dagens datum (YYYY-MM-DD) i svensk tid, oavsett serverns tidszon. */
+export function stockholmToday(now: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Det som behövs för att växla mellan en plats perioder, utan förslagen. */
+export type PeriodRef = Pick<RunView, "id" | "city" | "from" | "to" | "createdAt">;
+
+/** Är hela körningen passerad? */
+export function runIsPast(run: Pick<RunView, "to">, today: string): boolean {
+  return run.to < today;
+}
+
+/**
+ * Körningen som visas för en plats: den som täcker idag, annars närmast kommande, annars senast passerade.
+ * Vid lika vinner den senast skapade.
+ */
+export function pickRun<T extends Pick<RunView, "from" | "to" | "createdAt">>(runs: T[], today: string): T | null {
+  const newest = (a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
+  const current = runs.filter((r) => r.from <= today && today <= r.to).sort(newest);
+  if (current[0]) return current[0];
+  const upcoming = runs.filter((r) => r.from > today).sort((a, b) => a.from.localeCompare(b.from) || newest(a, b));
+  if (upcoming[0]) return upcoming[0];
+  const past = [...runs].sort((a, b) => b.to.localeCompare(a.to) || newest(a, b));
+  return past[0] ?? null;
+}
+
+/** En körning per plats enligt `pickRun`, i ordningen platserna först förekommer i `runs`. */
+export function pickRunPerPlace<T extends Pick<RunView, "city" | "from" | "to" | "createdAt">>(runs: T[], today: string): T[] {
+  const groups = new Map<string, T[]>();
+  for (const r of runs) groups.set(r.city, [...(groups.get(r.city) ?? []), r]);
+  return [...groups.values()].map((g) => pickRun(g, today)).filter((r): r is T => !!r);
+}
+
+/**
+ * Körningen utan passerade dagar: datum, väder och förslagens dagar före `today` tas bort.
+ * En helt passerad körning lämnas orörd, så att den fortfarande går att titta på.
+ */
+export function withoutPastDays(run: RunView, today: string): RunView {
+  if (runIsPast(run, today) || run.from >= today) return run;
+  return {
+    ...run,
+    dates: run.dates.filter((d) => d >= today),
+    weather: run.weather.filter((w) => w.date >= today),
+    // Förslag utan datum (t.ex. en park) behålls. Förslag vars alla datum har passerat tas bort.
+    items: run.items.flatMap((it) => {
+      if (!it.dates?.length) return [it];
+      const dates = it.dates.filter((d) => d.date >= today);
+      return dates.length ? [{ ...it, dates }] : [];
+    }),
+  };
 }
