@@ -227,3 +227,59 @@ test("kläder efter väder: temperaturtrappa, regn, lager och bebis", () => {
   assert.doesNotMatch(L.clothingFor({ date: "d", high: 5, low: 2 }, 30).items.join(" "), /Bebis/);
   assert.match(L.clothingFor({ date: "d", high: 5 }).headline, /Kallt/); // bara högsta känd
 });
+
+test("dagsplanen: ett evenemang med fast tid flyttas inte för en tupplur", () => {
+  const prof = { naps: [{ from: "09:30", to: "10:30" }, { from: "13:00", to: "14:30" }] };
+  const baby = { id: "bk", title: "Babykyrka", kind: "event", dates: [{ date: "2026-11-13", from: "10:15", to: "11:45" }], _travelMin: 12 };
+  const plan = L.autoPlan([baby], prof, "2026-11-13");
+  const act = plan.find((b) => b.kind === "aktivitet");
+  assert.equal(act.time, "10:15", JSON.stringify(plan));
+  assert.equal(act.endTime, "11:45", "not shortened");
+  const nap = plan.find((b) => b.kind === "vila");
+  assert.deepEqual([nap.time, nap.endTime], ["09:30", "10:03"], "nap ends at departure");
+  assert.match(nap.note, /sova vidare i vagnen/);
+  const trip = plan.find((b) => b.kind === "resa");
+  assert.deepEqual([trip.time, trip.endTime], ["10:03", "10:15"]);
+
+  // A nap that falls inside the event does not cut it short
+  const mid = { ...baby, dates: [{ date: "2026-11-13", from: "12:00", to: "14:00" }], _travelMin: 0 };
+  const p2 = L.autoPlan([mid], { naps: [{ from: "13:00", to: "14:00" }] }, "2026-11-13");
+  const a2 = p2.find((b) => b.kind === "aktivitet");
+  assert.deepEqual([a2.time, a2.endTime], ["12:00", "13:30"], JSON.stringify(p2));
+  assert.match(a2.note, /Tupplur under evenemanget/);
+  const rest = p2.find((b) => b.kind === "vila");
+  assert.deepEqual([rest.time, rest.endTime], ["13:30", "14:00"], "the part of the nap after the event is kept");
+
+  // A place (not an event) keeps the old behaviour: full nap first
+  const place = { ...baby, kind: "place" };
+  const p3 = L.autoPlan([place], prof, "2026-11-13");
+  assert.equal(p3.find((b) => b.kind === "vila").endTime, "10:30");
+});
+
+test("dagsplanen: fasta evenemang, tupplurar och lunch krockar aldrig", () => {
+  const ev = (id, from, to, extra = {}) => ({ id, title: id, kind: "event", dates: [{ date: "2026-11-13", from, to }], ...extra });
+  const check = (plan, label) => {
+    for (const b of plan) assert.ok(L.toMin(b.endTime) >= L.toMin(b.time), `${label}: block ends before it starts ${JSON.stringify(b)}`);
+    const real = plan.filter((b) => b.kind !== "info" && b.time !== b.endTime);
+    for (let i = 1; i < real.length; i++) assert.ok(L.toMin(real[i].time) >= L.toMin(real[i - 1].endTime), `${label}: overlap ${JSON.stringify(real[i - 1])} / ${JSON.stringify(real[i])}`);
+  };
+  const at = (plan, id) => { const b = plan.find((x) => x.itemId === id); return b && [b.time, b.endTime]; };
+
+  // Two naps inside a long event, then a later event: no block going backwards, no lunch inside the event
+  const p1 = L.autoPlan([ev("Long", "10:00", "15:00", { durationMin: 300 }), ev("Late", "16:00", "17:00", { durationMin: 60 })], { naps: [{ from: "11:00", to: "11:30" }, { from: "13:00", to: "14:00" }] }, "2026-11-13");
+  check(p1, "two naps"); assert.deepEqual(at(p1, "Long"), ["10:00", "15:00"]); assert.deepEqual(at(p1, "Late"), ["16:00", "17:00"]);
+
+  // Lunch does not push a fixed event; it comes after instead
+  const p2 = L.autoPlan([ev("Evt", "12:00", "13:00", { durationMin: 60, _travelMin: 10 })], { naps: [{ from: "11:00", to: "12:30" }] }, "2026-11-13");
+  check(p2, "lunch"); assert.deepEqual(at(p2, "Evt"), ["12:00", "13:00"]);
+  assert.ok(L.toMin(p2.find((b) => /lunch/i.test(b.title)).time) >= L.toMin("13:00"), JSON.stringify(p2));
+
+  // Two fixed events with a nap between them
+  const p3 = L.autoPlan([ev("A", "10:00", "11:00", { durationMin: 60 }), ev("B", "12:00", "13:00", { durationMin: 60, _travelMin: 30 })], { naps: [{ from: "11:00", to: "12:00" }] }, "2026-11-13");
+  check(p3, "two events"); assert.deepEqual(at(p3, "A"), ["10:00", "11:00"]); assert.deepEqual(at(p3, "B"), ["12:00", "13:00"]);
+
+  // "Tupplur + lunch" does not swallow a fixed event
+  const place = { id: "P", title: "P", kind: "place", dates: [{ date: "2026-11-13", from: "09:00", to: "11:40" }], durationMin: 160 };
+  const p4 = L.autoPlan([place, ev("E", "12:00", "13:00", { durationMin: 60 })], { naps: [{ from: "12:10", to: "13:00" }] }, "2026-11-13");
+  check(p4, "nap+lunch"); assert.deepEqual(at(p4, "E"), ["12:00", "13:00"]);
+});

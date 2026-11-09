@@ -478,31 +478,53 @@ function autoPlan(items            , profile         , date        , opts       
   const blocks        = [];
   let cur = dayStart, lunchDone = false;
   const takeNap = (n                                             ) => {
-    blocks.push({ start: Math.max(cur, n.from), end: n.to, kind: "vila", title: "Tupplur", note: "Vagnpromenad eller vila" });
-    cur = n.to; n.used = true;
+    // En tupplur som redan har passerat ger inget block, och tiden går aldrig bakåt.
+    if (n.to > cur) { blocks.push({ start: Math.max(cur, n.from), end: n.to, kind: "vila", title: "Tupplur", note: "Vagnpromenad eller vila" }); cur = n.to; }
+    n.used = true;
   };
   const queue = items
-    .map((it) => { const d = dayEntry(it, date); return { it, open: toMin(d?.from) ?? cur, close: toMin(d?.to) ?? end, dur: it.durationMin ?? 90, trav: it._travelMin ?? 0 }; })
+    .map((it) => { const d = dayEntry(it, date); const open = toMin(d?.from); return { it, open: open ?? cur, close: toMin(d?.to) ?? end, dur: it.durationMin ?? 90, trav: it._travelMin ?? 0, fixed: it.kind === "event" && open != null }; })
     .sort((a, b) => a.open - b.open);
   for (const q of queue) {
-    for (const n of naps) if (!n.used && n.from <= Math.max(cur, q.open - q.trav)) takeNap(n);
+    const leave = q.open - q.trav;
+    const napNotes           = [];
+    const napNote = (t        ) => { if (!napNotes.includes(t)) napNotes.push(t); };
+    for (const n of naps) {
+      if (n.used || n.from > Math.max(cur, leave)) continue;
+      // Ett evenemang börjar på en fast tid: tuppluren kortas till avresan i stället för att skjuta upp evenemanget.
+      // Resten av tuppluren hanteras med evenemanget nedan, så att det som blir över efter evenemanget inte försvinner.
+      if (q.fixed && n.to > leave) {
+        const from = Math.max(cur, n.from);
+        if (leave - from >= 15) blocks.push({ start: from, end: leave, kind: "vila", title: "Tupplur", note: `Kortare: ${q.it.title} börjar ${fmtMin(q.open)}. Låt barnet sova vidare i vagnen.` });
+        else napNote("Tuppluren krockar med avresan, låt barnet sova i vagnen");
+        cur = Math.max(cur, leave); n.from = Math.max(n.from, leave);
+      } else takeNap(n);
+    }
     if (!lunchDone && cur >= lunchAt - 15) {
-      const n = naps.find((x) => !x.used && x.from < cur + 45 && x.to > cur);
-      if (n) { blocks.push({ start: n.from, end: n.to, kind: "vila", title: "Tupplur + lunch", note: "Ät medan barnet sover i vagnen" }); cur = n.to; n.used = true; }
-      else { blocks.push({ start: cur, end: cur + 45, kind: "mat", title: "Lunch", note: "" }); cur += 45; }
-      lunchDone = true;
+      // Före ett evenemang med fast tid äts lunch bara om den hinns före avresan. Annars blir det lunch efteråt.
+      const room = q.fixed ? leave - cur : Number.POSITIVE_INFINITY;
+      const n = naps.find((x) => !x.used && x.from < cur + 45 && x.to > cur && x.to - cur <= room);
+      if (n) { blocks.push({ start: Math.max(cur, n.from), end: n.to, kind: "vila", title: "Tupplur + lunch", note: "Ät medan barnet sover i vagnen" }); cur = n.to; n.used = true; lunchDone = true; }
+      else if (room >= 45) { blocks.push({ start: cur, end: cur + 45, kind: "mat", title: "Lunch", note: "" }); cur += 45; lunchDone = true; }
     }
     let start = Math.max(cur + q.trav, q.open);
     let fin = start + q.dur;
     const clash = naps.find((n) => !n.used && start < n.to && fin > n.from);
-    if (clash) {
+    if (clash && q.fixed) {
+      // Evenemanget kortas eller flyttas inte för tupplurar som infaller under det. Det som blir över efteråt finns kvar.
+      for (const n of naps) {
+        if (n.used || !(start < n.to && fin > n.from)) continue;
+        if (n.to > fin) n.from = fin; else n.used = true;
+        napNote("Tupplur under evenemanget, i vagnen eller i famnen");
+      }
+    } else if (clash) {
       if (clash.from - start >= 45) fin = clash.from;
       else { cur = Math.max(cur, clash.from); takeNap(clash); start = Math.max(cur + q.trav, q.open); fin = start + q.dur; }
     }
     if (fin > q.close) fin = q.close;
     if (start >= fin || fin > end) { blocks.push({ start: cur, end: cur, kind: "info", title: q.it.title, note: "Får inte plats i dagen" }); continue; }
     if (q.trav > 0) blocks.push({ start: start - q.trav, end: start, kind: "resa", title: "Resa", note: q.it._travelNote ?? "" });
-    blocks.push({ start, end: fin, kind: "aktivitet", title: q.it.title, itemId: q.it.id, note: q.it.venue ?? "" });
+    blocks.push({ start, end: fin, kind: "aktivitet", title: q.it.title, itemId: q.it.id, note: [q.it.venue, ...napNotes].filter(Boolean).join(". ") });
     cur = fin;
   }
   for (const n of naps) if (!n.used && n.from >= cur && n.to <= end) takeNap(n);

@@ -2,6 +2,8 @@
 
 ## Ej släppt
 
+- Dagsplanen flyttar inte längre ett evenemang med fast tid för en tupplur (`autoPlan`). Tuppluren kortas till avresan med rådet att låta barnet sova vidare i vagnen, och en tupplur under evenemanget kortar inte evenemanget. Platser utan fast tid planeras som förut. Exempel: Babykyrka 10.15 planerades tidigare 10.42.
+- Förslag: valet "Restid från" heter "Sökningens utgångspunkt" när ingen sparad plats finns, så att det stämmer med texten under. "Sökningens egna restider" visas bara när det skiljer sig från standardvalet.
 - Förslag öppnar på rätt period: för varje stad visas sökningen som täcker idag, annars den närmast kommande, annars den senast passerade (`pickRun`). Tidigare visades den senast skapade, så en sökning för om två veckor kunde skymma veckans. När en stad har flera sökningar finns en rad med perioderna att växla mellan.
 - Passerade dagar visas inte längre: datum, väder och förslag före idag tas bort (`withoutPastDays`), även i listan och schemat. En helt passerad sökning visas med en notis och länk till Beställ, utan Planera dagen. Dagsplanen säger till om dagen har passerat. "Idag" räknas i svensk tid på servern.
 - "Öppna i Kartor" och "Lägg i kalendern" på varje förslag och på aktiviteterna i dagsplanen (`web/src/lib/links.ts`). Kartlänken använder koordinater, annars plats och stad. Kalenderlänken öppnar ett ifyllt utkast i Google Kalender i svensk tid, utan API: evenemang får sina tider, platser blir heldag med öppettiderna i beskrivningen, och i dagsplanen används planens tid (eller evenemangets egen).

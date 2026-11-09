@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { readableName, walkingBeatsTransit, type TripSummary } from "@/lib/travel/resrobot";
 import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Item, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
 import { rate } from "@/app/actions";
@@ -36,13 +36,16 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
   const siblings = run ? allRuns.filter((r) => r.city === run.city).sort((a, b) => a.from.localeCompare(b.from) || b.createdAt.localeCompare(a.createdAt)) : [];
   const city: CityRow = fullRun ? cityFor(fullRun, cities) : { id: "", name: "" };
   const places = (profile.places ?? []).filter(hasCoords);
+  // Standardplatsen är stadens valda plats, annars en sparad plats i staden. Saknas båda används sökningens egna restider.
+  const autoPlace = places.find((p) => p.id === city.defaultPlaceId) ?? places.find((p) => p.city === city.id);
 
-  const origin: Origin | null = useMemo(() => {
+  // Billig uträkning, därför ingen memoisering.
+  const origin: Origin | null = (() => {
     if (originChoice === "gps") return geo.state.status === "ok" ? { name: geo.state.address || "här du är nu", lat: geo.state.lat, lng: geo.state.lng } : null;
     if (originChoice === "run") return null;
-    const chosen = originChoice === "auto" ? places.find((p) => p.id === city.defaultPlaceId) ?? places.find((p) => p.city === city.id) : places.find((p) => p.id === originChoice);
+    const chosen = originChoice === "auto" ? autoPlace : places.find((p) => p.id === originChoice);
     return chosen && hasCoords(chosen) ? { name: chosen.name || chosen.address, lat: chosen.lat, lng: chosen.lng } : null;
-  }, [originChoice, geo.state, places, city.defaultPlaceId, city.id]);
+  })();
 
   if (!run) return <div className="card empty">Inga förslag ännu. Beställ en helg, vecka eller månad under Beställ.</div>;
 
@@ -102,11 +105,11 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
 
       <div className="controls">
         <label htmlFor="origin">Restid från
-          <select id="origin" value={originChoice} onChange={(e) => { setOriginChoice(e.target.value); if (e.target.value === "gps") geo.request(); }}>
-            <option value="auto">Standardplats ({run.origin?.name ?? "från sökningen"})</option>
+          <select id="origin" value={originChoice === "run" && !autoPlace ? "auto" : originChoice} onChange={(e) => { setOriginChoice(e.target.value); if (e.target.value === "gps") geo.request(); }}>
+            <option value="auto">{autoPlace ? `Standardplats (${autoPlace.name || autoPlace.address})` : `Sökningens utgångspunkt${run.origin?.name ? ` (${run.origin.name})` : ""}`}</option>
             <option value="gps">Där jag är nu (GPS)</option>
             {places.map((p) => <option key={p.id} value={p.id}>{p.name || p.address}</option>)}
-            <option value="run">Sökningens egna restider</option>
+            {autoPlace ? <option value="run">Sökningens egna restider</option> : null}
           </select>
         </label>
         <p className="meta" aria-live="polite">
