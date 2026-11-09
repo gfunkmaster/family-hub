@@ -35,18 +35,10 @@ async function cityNames(): Promise<Map<string, string>> {
   return new Map((await db().city.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
 }
 
-/** Senaste körningen per stad eller plats. */
-export async function getLatestRunPerCity(): Promise<RunView[]> {
+/** De senaste körningarna, nyast först. Vilken som visas per plats avgörs av `pickRunPerPlace`. */
+export async function getRecentRuns(): Promise<RunView[]> {
   const [rows, names] = await Promise.all([db().run.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), cityNames()]);
-  const seen = new Set<string>();
-  const out: RunView[] = [];
-  for (const r of rows) {
-    const v = toRunView(r, names);
-    if (seen.has(v.city)) continue;
-    seen.add(v.city);
-    out.push(v);
-  }
-  return out;
+  return rows.map((r) => toRunView(r, names));
 }
 
 export async function getRun(id: string): Promise<RunView | null> {

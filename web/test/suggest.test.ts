@@ -96,3 +96,43 @@ test("schema: kostnaden summeras och okända priser markeras", () => {
   assert.equal(sch.total, known.reduce((a, b) => a + b, 0));
   assert.equal(sch.unknownCost, sch.days.some((d) => d.pick && d.pick.cost.total == null));
 });
+
+test("rätt körning per plats: idag, annars närmast kommande, annars senast passerade", async () => {
+  const { pickRun, pickRunPerPlace } = await import("../src/lib/suggest.ts");
+  const r = (id: string, city: string, from: string, to: string, createdAt: string) => ({ id, city, from, to, createdAt });
+  const thisWeek = r("sthlm-v46", "stockholm", "2026-11-09", "2026-11-15", "2026-11-06T10:00:00Z");
+  const later = r("sthlm-21", "stockholm", "2026-11-21", "2026-11-22", "2026-11-08T10:00:00Z");
+  const old = r("sthlm-v44", "stockholm", "2026-10-26", "2026-11-01", "2026-10-20T10:00:00Z");
+  const vaxjo = r("vaxjo-07", "vaxjo", "2026-11-07", "2026-11-08", "2026-11-05T10:00:00Z");
+  assert.equal(pickRun([later, thisWeek, old], "2026-11-09")?.id, "sthlm-v46", "the run covering today wins over a newer one");
+  assert.equal(pickRun([later, old], "2026-11-09")?.id, "sthlm-21", "otherwise the next upcoming");
+  assert.equal(pickRun([old, vaxjo], "2026-11-09")?.id, "vaxjo-07", "otherwise the most recently ended");
+  const redo = r("sthlm-v46b", "stockholm", "2026-11-09", "2026-11-15", "2026-11-07T10:00:00Z");
+  assert.equal(pickRun([thisWeek, redo], "2026-11-10")?.id, "sthlm-v46b", "a tie goes to the newest search");
+  assert.equal(pickRun([], "2026-11-09"), null);
+  assert.deepEqual(pickRunPerPlace([later, vaxjo, thisWeek], "2026-11-09").map((x) => x.id), ["sthlm-v46", "vaxjo-07"]);
+});
+
+test("passerade dagar tas bort, men en helt passerad körning lämnas orörd", async () => {
+  const { withoutPastDays, runIsPast } = await import("../src/lib/suggest.ts");
+  const wed = withoutPastDays({ ...run, weather: weekdays.map((date) => ({ date, high: 5 })), items: [...run.items, { id: "park", title: "Park" }] }, "2026-11-11");
+  assert.deepEqual(wed.dates, ["2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"]);
+  assert.deepEqual(wed.weather.map((w) => w.date), ["2026-11-11", "2026-11-12", "2026-11-13"]);
+  assert.deepEqual(wed.items.find((i) => i.id === "near")?.dates?.map((d) => d.date), ["2026-11-11", "2026-11-12", "2026-11-13"]);
+  assert.ok(wed.items.some((i) => i.id === "park"), "items without dates stay");
+  const sat = withoutPastDays(run, "2026-11-14");
+  assert.ok(!sat.items.some((i) => i.id === "near"), "items whose every date has passed are dropped");
+  const list = rankedSuggestions(wed, profile, city, null, [], { tier: "alla", ageOnly: false });
+  assert.ok(list.every((s) => s.date >= "2026-11-11"), "the list view never links to a past day");
+  const stray = rankedSuggestions({ ...run, items: [...run.items, { id: "next-month", title: "Julmarknad", dates: [{ date: "2026-12-05", from: "10:00" }] }] }, profile, city, null, [], { tier: "alla", ageOnly: false });
+  assert.ok(!stray.some((s) => s.item.id === "next-month"), "an event outside the period is not offered for a day it isn't on");
+  assert.equal(withoutPastDays(run, "2026-11-20"), run);
+  assert.equal(runIsPast(run, "2026-11-20"), true);
+  assert.equal(runIsPast(run, "2026-11-15"), false);
+});
+
+test("dagens datum räknas i svensk tid", async () => {
+  const { stockholmToday } = await import("../src/lib/suggest.ts");
+  assert.equal(stockholmToday(new Date("2026-11-09T23:30:00Z")), "2026-11-10", "00:30 in Stockholm is already the next day");
+  assert.equal(stockholmToday(new Date("2026-06-30T21:59:00Z")), "2026-06-30", "summer time, 23:59 in Stockholm");
+});

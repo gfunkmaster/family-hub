@@ -20,7 +20,7 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 ## P2: Funktioner
 
 10. **"Här nu" och delade kartlänkar.** Ett fält under Förslag som tar koordinater eller en delad länk från Google Maps eller Apple Kartor. Dessutom ett flöde i chatten: "använd min plats" sparar telefonens position som "Här nu".
-11. **Lägg aktiviteter i kalendern.** Valda aktiviteter och sparade scheman blir händelser i Google Kalender (`create_event`), med påminnelse när förbokning öppnar.
+11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Kvar: sparade scheman som flera händelser, och påminnelse när förbokning öppnar.
 12. **Uppdatera vädret närmare dagen.** Vid månadskörningar saknas väder längre fram. En lätt körning dagen innan kan fylla på.
 13. **Bättre schemaläggning.** Ta hänsyn till veckobudget, inomhus vid regn, att återkommande pass gärna blir fasta veckodagar, och restid mellan aktiviteter.
 
