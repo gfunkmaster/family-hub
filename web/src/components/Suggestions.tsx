@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { readableName, walkingBeatsTransit, type TripSummary } from "@/lib/travel/resrobot";
-import { ageMonths, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Item, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
+import { ageMonths, bookingStatus, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Item, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
 import { rate } from "@/app/actions";
 import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
@@ -152,12 +152,12 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
                 {d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}
               </div>
               <Clothes weather={d.weather} profile={profile} date={d.date} />
-              {d.top.length ? d.top.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} area={run.label} past={past} compact lead={i === 0} plain={i > 0} />) : <p className="meta">Inget som passar den här dagen.</p>}
+              {d.top.length ? d.top.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={d.date} from={tripFrom} area={run.label} past={past} today={today} compact lead={i === 0} plain={i > 0} />) : <p className="meta">Inget som passar den här dagen.</p>}
               {d.more ? <p className="meta">{d.more} förslag till under Alla förslag.</p> : null}
             </section>
           );
         })
-        : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} area={run.label} past={past} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
+        : list.length ? list.map((s, i) => <Card key={s.item.id} s={s} runId={run.id} date={s.date} from={tripFrom} area={run.label} past={past} today={today} lead={i === 0} plain={i > 0} />) : <div className="card empty">Inget matchar filtret.</div>}
     </section>
   );
 }
@@ -276,7 +276,7 @@ function TransitTrip({ from, item, date }: { from: Origin; item: { title?: strin
   );
 }
 
-function Card({ s, runId, date, from, area, past = false, compact = false, lead = false, plain = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; area?: string; past?: boolean; compact?: boolean; lead?: boolean; plain?: boolean }) {
+function Card({ s, runId, date, from, area, today, past = false, compact = false, lead = false, plain = false }: { s: Suggestion; runId: string; date: string; from: Origin | null; area?: string; today: string; past?: boolean; compact?: boolean; lead?: boolean; plain?: boolean }) {
   const [pending, start] = useTransition();
   const { item: it, cost, fit, travel, tier } = s;
   const vote = (verdict: "bra" | "nej" | "besokt") => start(() => rate({ key: s.key, runId, itemId: it.id, verdict }));
@@ -291,6 +291,14 @@ function Card({ s, runId, date, from, area, past = false, compact = false, lead 
     location: it.venue,
     details: [entry?.from && it.kind !== "event" ? `Öppet ${entry.from}–${entry.to ?? ""}` : null, it.note, it.sources?.[0]?.url].filter(Boolean).join("\n"),
   });
+  const booking = past ? null : bookingStatus(it, today);
+  const opensTxt = booking?.opensDate ? `${dayName(booking.opensDate)}${booking.opensTime ? ` kl. ${booking.opensTime}` : ""}` : "";
+  // Påminnelse i kalendern den dag bokningen öppnar.
+  const bookCal = booking?.opensLater && booking.opensDate ? calendarUrl({
+    title: `Boka: ${it.title}`, date: booking.opensDate,
+    ...(booking.opensTime ? { start: booking.opensTime, durationMin: 15 } : {}),
+    details: [`Bokningen öppnar för ${it.title} (${dayName(date)}).`, booking.url].filter(Boolean).join("\n"),
+  }) : null;
   const when = (it.dates ?? []).filter((d) => !compact || d.date === s.date).map((d) => `${dayName(d.date)} ${d.from ?? ""}–${d.to ?? ""}`).join(" · ");
   return (
     <article className={`card item ${it.conflict ? "conflict" : it.verified ? "verified" : ""}${lead ? " lead" : ""}${plain ? " plain" : ""}`}>
@@ -311,7 +319,19 @@ function Card({ s, runId, date, from, area, past = false, compact = false, lead 
         <span className={`chip ${levelClass(fit.level)}`}>Ålder: {fit.level}</span>
         <span className="chip"><span className="cost">{costTxt}</span></span>
         {it.verified ? <span className="chip good">Verifierad</span> : <span className="chip ghost">Ej verifierad</span>}
+        {booking?.state === "krävs" ? <span className="chip warn">Förbokning krävs</span> : null}
+        {booking?.state === "ej" ? <span className="chip good">Drop-in</span> : null}
       </div>
+      {booking && booking.state !== "ej" ? (
+        <p className="note booking">
+          <b>{booking.opensLater ? `Bokningen öppnar ${opensTxt}.` : booking.state === "krävs" ? "Boka i förväg." : "Förbokning kan krävas."}</b>
+          {booking.opensLater && booking.state === "kanske" ? " Oklart om bokning krävs." : ""}
+          {booking.opened ? ` Bokningen öppnade ${opensTxt}.` : ""}
+          {booking.note ? ` ${booking.note}` : ""}
+          {booking.url ? <> <a href={booking.url} target="_blank" rel="noopener noreferrer">Till bokningen</a></> : null}
+          {bookCal ? <> · <a href={bookCal} target="_blank" rel="noopener noreferrer">Påminn mig i kalendern</a></> : null}
+        </p>
+      ) : null}
       {!compact && fit.note ? <p className="note">{fit.note}</p> : null}
       {!compact && it.note ? <p className="note">{it.note}</p> : null}
       {from ? <TransitTrip from={from} item={it} date={date} /> : null}

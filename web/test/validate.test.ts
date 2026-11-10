@@ -124,3 +124,34 @@ test("stad: okända fält tas bort och orimliga värden avvisas", () => {
   assert.equal(parseCity("x", { name: "X", sources: [{ name: "", url: "https://x.se" }] }).ok, false);
   assert.equal(parseCity("x", { name: "X", defaultPlaceId: "../x" }).ok, false);
 });
+
+test("förbokning valideras", () => {
+  const withBooking = (booking: unknown) => parseRun({ ...run, items: [{ ...item, booking }] });
+  assert.equal(withBooking({ required: "ja", opensAt: "2026-11-12T09:00", url: "https://boka.example/x", note: "20 platser" }).ok, true);
+  assert.equal(withBooking({ required: "oklart", opensAt: null, url: null }).ok, true);
+  assert.equal(withBooking({ opensAt: "2026-11-12" }).ok, true);
+  assert.equal(withBooking({ required: "oklart", opensAt: null, url: null, note: null }).ok, true, "null överallt, som prompten ber om för okänt");
+  assert.equal(withBooking({ required: "oklart", opensAt: "", url: "", note: "" }).ok, true, "tom text är okänt, inte ett fel");
+  assert.equal(withBooking({ required: "ja", opensAt: "2026-11-12T09:00:00" }).ok, true, "sekunder godtas");
+  assert.equal(withBooking({ required: "ja", note: "x".repeat(900) }).ok, true, "en lång anteckning fäller inte körningen");
+  for (const [bad, part] of [
+    [{ required: "kanske" }, "booking.required"],
+    [{ opensAt: "12 nov" }, "booking.opensAt"],
+    [{ opensAt: "2026-13-40" }, "booking.opensAt"],
+    [{ opensAt: "2026-02-30" }, "booking.opensAt"],
+    [{ opensAt: "2026-11-12T25:00" }, "booking.opensAt"],
+    [{ url: "javascript:alert(1)" }, "booking.url"],
+    [{ note: 5 }, "booking.note"],
+    ["ja", "booking är inget objekt"],
+  ] as const) {
+    const r = withBooking(bad);
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    if (!r.ok) assert.ok(r.errors.join("\n").includes(part), `${part}: ${r.errors.join("; ")}`);
+  }
+});
+
+test("omöjliga datum avvisas", () => {
+  assert.equal(parseRun({ ...run, items: [{ ...item, dates: [{ date: "2026-02-30" }] }] }).ok, false);
+  assert.equal(parseRun({ ...run, from: "2026-11-31", to: "2026-12-01" }).ok, false);
+  assert.equal(parseRun({ ...run, items: [{ ...item, dates: [{ date: "2028-02-29" }] }] }).ok, true, "skottdag");
+});

@@ -178,6 +178,8 @@ details summary{cursor:pointer;font-weight:600}
                                                 
 
                                                                                              
+/** Förbokning: om den krävs, när bokningen öppnar ("YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM", svensk tid) och var man bokar. */
+                                                                                                                        
 
                        
              
@@ -193,6 +195,7 @@ details summary{cursor:pointer;font-weight:600}
                   
                                                                                                   
                                                      
+                    
                 
                            
                   
@@ -309,6 +312,35 @@ function ageFitFor(item      , children                     , date        )     
     worst = Math.min(worst, lvl);
   }
   return { level: LEVELS[worst] ?? "oklart", note: a.note ?? "" };
+}
+
+// ---------- Booking ----------
+
+/** "YYYY-MM-DD", "YYYY-MM-DDTHH:MM" eller med sekunder, som modeller ofta skriver. Sekunderna används inte. */
+const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::\d{2})?)?$/;
+                                
+                                                                                                                           
+                                   
+                                                                                                 
+                      
+                                           
+                  
+                                                                                       
+ 
+/**
+ * Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte.
+ * Bara "oklart" utan öppningstid, länk eller anteckning räknas som okänt.
+ */
+function bookingStatus(item                       , today        )                       {
+  const b = item.booking;
+  if (!b) return null;
+  const m = BOOKING_OPENS.exec(b.opensAt ?? "");
+  const opensDate = m?.[1] ?? null, opensTime = m?.[2] ?? null;
+  const url = safeUrl(b.url), note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 300);
+  const state = b.required === "ja" ? "krävs" : b.required === "nej" ? "ej" : "kanske";
+  if (state === "kanske" && !opensDate && !url && !note) return null;
+  const opensLater = opensDate != null && (opensDate > today || (opensDate === today && opensTime != null));
+  return { state, opensLater, opened: opensDate != null && opensDate < today, opensDate, opensTime, url, note };
 }
 
 // ---------- Cost ----------

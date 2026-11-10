@@ -49,6 +49,8 @@ export interface Leg { min?: number | null; km?: number | null; note?: string; p
 export type Travel = Partial<Record<Mode, Leg>>;
 
 export interface DayEntry { date: string; from?: string; to?: string; adult?: number | null }
+/** Förbokning: om den krävs, när bokningen öppnar ("YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM", svensk tid) och var man bokar. */
+export interface Booking { required?: YesNo | null; opensAt?: string | null; url?: string | null; note?: string | null }
 
 export interface Item {
   id: string;
@@ -64,6 +66,7 @@ export interface Item {
   travel?: Travel;
   ageFit?: { level?: Level; minMonths?: number | null; maxMonths?: number | null; note?: string };
   practical?: { stroller?: YesNo; changing?: YesNo };
+  booking?: Booking;
   note?: string;
   conflict?: string | null;
   tags?: string[];
@@ -180,6 +183,35 @@ export function ageFitFor(item: Item, children: Child[] | undefined, date: strin
     worst = Math.min(worst, lvl);
   }
   return { level: LEVELS[worst] ?? "oklart", note: a.note ?? "" };
+}
+
+// ---------- Booking ----------
+
+/** "YYYY-MM-DD", "YYYY-MM-DDTHH:MM" eller med sekunder, som modeller ofta skriver. Sekunderna används inte. */
+export const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::\d{2})?)?$/;
+export interface BookingStatus {
+  /** "krävs": arrangören kräver bokning. "kanske": det finns bokningsuppgifter men inget besked om krav. "ej": drop-in. */
+  state: "krävs" | "kanske" | "ej";
+  /** Bokningen har inte öppnat än: öppnar en senare dag, eller idag på ett angivet klockslag. */
+  opensLater: boolean;
+  /** Bokningen öppnade en tidigare dag. */
+  opened: boolean;
+  opensDate: string | null; opensTime: string | null; url: string | null; note: string;
+}
+/**
+ * Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte.
+ * Bara "oklart" utan öppningstid, länk eller anteckning räknas som okänt.
+ */
+export function bookingStatus(item: Pick<Item, "booking">, today: string): BookingStatus | null {
+  const b = item.booking;
+  if (!b) return null;
+  const m = BOOKING_OPENS.exec(b.opensAt ?? "");
+  const opensDate = m?.[1] ?? null, opensTime = m?.[2] ?? null;
+  const url = safeUrl(b.url), note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 300);
+  const state = b.required === "ja" ? "krävs" : b.required === "nej" ? "ej" : "kanske";
+  if (state === "kanske" && !opensDate && !url && !note) return null;
+  const opensLater = opensDate != null && (opensDate > today || (opensDate === today && opensTime != null));
+  return { state, opensLater, opened: opensDate != null && opensDate < today, opensDate, opensTime, url, note };
 }
 
 // ---------- Cost ----------

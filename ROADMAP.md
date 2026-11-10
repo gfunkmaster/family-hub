@@ -15,12 +15,12 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 6. **Bygg ut källregistret.** Växjö stadsbibliotek och närbibliotek, Stockholms stadsdelsbibliotek nära er, Svenska kyrkans öppna förskola och babycafé per församling, Kulturhuset Stadsteatern barn, museernas familjeprogram. Lägg också till Länstrafiken Kronobergs regler för barn och SL:s pris för 2026.
 7. **Riktiga restider.** Trafiklab ResRobot för kollektivtrafik (kräver API-nyckel) och en ruttmotor för bil. Måste köras på en server eller i den schemalagda körningen, eftersom appen inte får anropa andra sajter.
 8. **Strukturerade källor istället för fri hämtning.** Många bibliotek och kommuner har evenemangsflöden (ICS, RSS eller JSON). Adaptrar per källa ger stabilare och billigare körningar än att låta Claude läsa hela sidor.
-9. **Förbokning och biljetter.** Lägg till fält för "förbokning krävs", när bokningen öppnar och en länk, och visa dem i appen.
+9. ~~Förbokning och biljetter.~~ Klart på hemsidan: `Item.booking` med krav, öppningstid och länk, och påminnelse i kalendern när bokningen öppnar.
 
 ## P2: Funktioner
 
 10. **"Här nu" och delade kartlänkar.** Ett fält under Förslag som tar koordinater eller en delad länk från Google Maps eller Apple Kartor. Dessutom ett flöde i chatten: "använd min plats" sparar telefonens position som "Här nu".
-11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Kvar: sparade scheman som flera händelser, och påminnelse när förbokning öppnar.
+11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Påminnelse när förbokning öppnar finns. Kvar: sparade scheman som flera händelser.
 12. **Uppdatera vädret närmare dagen.** Vid månadskörningar saknas väder längre fram. En lätt körning dagen innan kan fylla på.
 13. **Bättre schemaläggning.** Ta hänsyn till veckobudget, inomhus vid regn, att återkommande pass gärna blir fasta veckodagar, och restid mellan aktiviteter.
 

@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Förbokning på förslagen (`Item.booking`): om bokning krävs, när den öppnar och en länk till bokningssidan. Förslag-sidan visar "Förbokning krävs" eller "Drop-in", när bokningen öppnar, och en länk som lägger en påminnelse i Google Kalender den dagen. Okänt visas inte alls. Valideras i `parseRun`, och både direktsökningen och torsdagskörningens instruktioner frågar efter fältet.
 - Dagsplanen flyttar inte längre ett evenemang med fast tid för en tupplur (`autoPlan`). Tuppluren kortas till avresan med rådet att låta barnet sova vidare i vagnen, och en tupplur under evenemanget kortar inte evenemanget. Platser utan fast tid planeras som förut. Exempel: Babykyrka 10.15 planerades tidigare 10.42.
 - Förslag: valet "Restid från" heter "Sökningens utgångspunkt" när ingen sparad plats finns, så att det stämmer med texten under. "Sökningens egna restider" visas bara när det skiljer sig från standardvalet.
 - Förslag öppnar på rätt period: för varje stad visas sökningen som täcker idag, annars den närmast kommande, annars den senast passerade (`pickRun`). Tidigare visades den senast skapade, så en sökning för om två veckor kunde skymma veckans. När en stad har flera sökningar finns en rad med perioderna att växla mellan.

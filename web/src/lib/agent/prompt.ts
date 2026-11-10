@@ -25,6 +25,7 @@ export const SYSTEM = `Du är en researchagent som hittar aktiviteter för en ba
 Regler:
 - Använd webbsökning och hämta arrangörens egen sida för varje evenemang. verified=true bara om arrangörens sida bekräftar datum och tid. Säger källor olika saker: förklara i conflict och sätt verified=false.
 - Gissa aldrig priser, tider eller åldersgränser. Okänt är null.
+- Förbokning: booking.required är "ja" eller "nej" bara om arrangörens sida säger det, annars "oklart". opensAt bara om sidan anger när bokningen öppnar, annars null.
 - Varje förslag, matställe och matlåda ska ha minst en källa (url) som du faktiskt har läst.
 - Åldersråd för mat följer Livsmedelsverket. Varje matlåda ska ha minst en källa på https://www.livsmedelsverket.se/ som stöder att maten passar åldern.
 - Svara till sist med EXAKT ett JSON-objekt i ett kodblock märkt json, och inget efter det.`;
@@ -42,6 +43,7 @@ const SCHEMA = `{
      "travel": {"walk": {"min": tal, "note": "ca"}, "transit": {"min": tal, "note": ""}, "car": {"km": tal, "min": tal, "note": "ca"}},
      "ageFit": {"level": "säkert"|"troligt"|"oklart", "minMonths": tal|null, "maxMonths": tal|null, "note": "en mening"},
      "practical": {"stroller": "ja"|"nej"|"oklart", "changing": "ja"|"nej"|"oklart"},
+     "booking": {"required": "ja"|"nej"|"oklart", "opensAt": "YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM" eller null, "url": "bokningssidan" eller null, "note": "t.ex. begränsat antal platser"},
      "note": "", "conflict": "text" eller utelämna, "tags": [""], "verified": true|false, "sources": [{"title": "", "url": ""}]}],
   "food": [{"id": "kort-slug", "title": "", "venue": "", "lat": tal, "lng": tal, "near": ["id på förslag i items"],
      "highChair": "ja"|"nej"|"oklart", "microwave": "ja"|"nej"|"oklart", "changing": "ja"|"nej"|"oklart",
