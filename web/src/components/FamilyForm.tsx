@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ageMonths, isoDate, type Profile } from "@family-hub/logic";
 import { saveProfile } from "@/app/actions";
 import { useGeolocation } from "@/components/useGeolocation";
@@ -8,6 +8,9 @@ import { useGeolocation } from "@/components/useGeolocation";
 type Child = NonNullable<Profile["children"]>[number];
 type Nap = NonNullable<Profile["naps"]>[number];
 type Place = NonNullable<Profile["places"]>[number];
+type LookupStatus = "loading" | "none" | "ambiguous" | "error";
+/** Början på geoNote för koordinater som kom från kartuppslaget. */
+const MAP_NOTE = "Karta";
 
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const tags = (s: string) => s.split(",").map((t) => t.trim()).filter(Boolean);
@@ -53,6 +56,10 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
   const [dirty, setDirty] = useState(false);
   const [pending, start] = useTransition();
   const geo = useGeolocation();
+  const [lookup, setLookup] = useState<Record<string, LookupStatus>>({});
+  // Senaste platserna, för svar som kommer efter att adressen har ändrats.
+  const placesRef = useRef(places);
+  useEffect(() => { placesRef.current = places; }, [places]);
 
   const touch = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); setResult(null); };
   const updateChild = (i: number, c: Partial<Child>) => touch(setChildren)(children.map((x, j) => (j === i ? { ...x, ...c } : x)));
@@ -63,6 +70,31 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
     const s = await geo.request();
     if (s.status !== "ok") return;
     touch(setPlaces)([...places, { id: newId("plats"), name: "Här", lat: Math.round(s.lat * 1e6) / 1e6, lng: Math.round(s.lng * 1e6) / 1e6, geoNote: `GPS ±${Math.round(s.accuracy)} m`, ...(homeCity ? { city: homeCity } : {}) }]);
+  };
+
+  // Slår upp adressens koordinater på servern (OpenStreetMap). Platsen pekas ut med id, eftersom listan kan ha ändrats
+  // under tiden, och svaret (träff eller fel) används bara om adressen fortfarande är den som slogs upp.
+  const setLookupFor = (id: string, status: LookupStatus | null) => setLookup((cur) => { const next = { ...cur }; if (status) next[id] = status; else delete next[id]; return next; });
+  const lookUp = async (id: string, address: string) => {
+    const current = () => (placesRef.current.find((x) => x.id === id)?.address ?? "") === address;
+    setLookupFor(id, "loading");
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
+      if (!res.ok) throw new Error();
+      const { hit, ambiguous } = (await res.json()) as { hit: { lat: number; lng: number; label: string } | null; ambiguous: boolean };
+      if (!current()) return;
+      if (!hit) { setLookupFor(id, ambiguous ? "ambiguous" : "none"); return; }
+      setPlaces((cur) => cur.map((x) => (x.id === id && (x.address ?? "") === address ? { ...x, lat: hit.lat, lng: hit.lng, geoNote: `${MAP_NOTE}${hit.label ? `: ${hit.label}` : ""}`.slice(0, 120) } : x)));
+      setDirty(true); setResult(null); setLookupFor(id, null);
+    } catch { if (current()) setLookupFor(id, "error"); }
+  };
+  // Ändras adressen gäller inte längre koordinater som kom från kartuppslaget. En GPS-position behålls: där är adressen bara en etikett.
+  const changeAddress = (i: number, address: string) => {
+    const p = places[i];
+    if (!p) return;
+    setLookupFor(p.id, null);
+    const fromMap = p.geoNote?.startsWith(MAP_NOTE);
+    touch(setPlaces)(places.map((x, j) => (j !== i ? x : fromMap ? { id: x.id, ...(x.name ? { name: x.name } : {}), ...(x.city ? { city: x.city } : {}), address } : { ...x, address })));
   };
 
   const save = () => start(async () => {
@@ -136,14 +168,14 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
 
       <div className="block">
         <h2>Platser</h2>
-        <p className="meta">Restid räknas från platsen du väljer under Förslag. En plats utan koordinater kan inte användas för restid.</p>
+        <p className="meta">Restid räknas från platsen du väljer under Förslag. En plats utan koordinater kan inte användas för restid: skriv adressen och tryck på Slå upp adressen.</p>
         {cities.length ? (
           <label>Hemstad<select value={homeCity} onChange={(e) => touch(setHomeCity)(e.target.value)}>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         ) : null}
         {places.map((p, i) => (
           <div key={p.id} className="grid2">
             <label>Namn<input value={p.name ?? ""} maxLength={60} onChange={(e) => updatePlace(i, { name: e.target.value })} /></label>
-            <label>Adress<input value={p.address ?? ""} maxLength={120} onChange={(e) => updatePlace(i, { address: e.target.value })} /></label>
+            <label>Adress<input value={p.address ?? ""} maxLength={120} onChange={(e) => changeAddress(i, e.target.value)} /></label>
             {cities.length ? (
               <label>Stad<select value={p.city ?? ""} onChange={(e) => updatePlace(i, { city: e.target.value || undefined })}>
                 <option value="">Ingen</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -151,7 +183,15 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
             ) : null}
             <div className="row">
               {p.lat != null && p.lng != null ? <span className="chip good">{p.lat.toFixed(4)}, {p.lng.toFixed(4)}{p.geoNote ? ` · ${p.geoNote}` : ""}</span> : <span className="chip warn">Koordinater saknas</span>}
+              {p.address && p.address.trim().length >= 2 ? (
+                <button type="button" className="small" disabled={lookup[p.id] === "loading"} onClick={() => { void lookUp(p.id, p.address ?? ""); }}>
+                  {lookup[p.id] === "loading" ? "Slår upp…" : p.lat != null ? "Slå upp adressen igen" : "Slå upp adressen"}
+                </button>
+              ) : null}
               <button type="button" className="small" onClick={() => touch(setPlaces)(places.filter((_, j) => j !== i))}>Ta bort</button>
+              {lookup[p.id] === "ambiguous" ? <span className="error" role="status">Adressen finns på flera orter. Skriv orten också, t.ex. Storgatan 3, Växjö.</span> : null}
+              {lookup[p.id] === "none" ? <span className="error" role="status">Adressen hittades inte. Prova med ort, t.ex. Storgatan 3, Växjö.</span> : null}
+              {lookup[p.id] === "error" ? <span className="error" role="status">Adressen kunde inte slås upp just nu.</span> : null}
             </div>
           </div>
         ))}

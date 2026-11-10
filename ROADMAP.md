@@ -46,4 +46,4 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 26. **Installera som app.** Klar: manifest, SVG-ikon och PNG-ikoner.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.
 28. **Fler leverantörer för direktsökning.** DeepSeek eller liknande via `LlmProvider`. Kräver en egen sökmotor (t.ex. Brave Search API), eftersom de saknar inbyggd webbsökning.
-29. **Geokodning på servern.** En adress eller ort utan koordinater får nu sina koordinater av agenten. En geokodare på servern ger restid redan innan sökningen.
+29. ~~Geokodning på servern.~~ Klart: beställningar med adress eller ort och sparade platser på Familj-sidan får koordinater via Nominatim (`/api/geocode`). Agentens koordinater används bara när adressen inte hittas.
