@@ -170,7 +170,7 @@ function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: st
   return (
     <section className="schedule" aria-label="Schema">
       <p className="meta">
-        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan. Inomhus går före när regn väntas.
+        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan. När regn väntas väljs utomhus bara om inget annat passar.
         {" "}Kostnad ca {kr(schedule.total)}{schedule.unknownCost ? " plus okända priser" : ""}{rest ? `, ${rest} vilodag${rest > 1 ? "ar" : ""}` : ""}.
       </p>
       {schedule.weeks.length > 1 || schedule.weeks.some((w) => w.budget != null) ? (
