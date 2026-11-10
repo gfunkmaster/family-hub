@@ -195,7 +195,8 @@ export function ageFitFor(item: Item, children: Child[] | undefined, date: strin
 
 // ---------- Booking ----------
 
-export const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
+/** "YYYY-MM-DD", "YYYY-MM-DDTHH:MM" eller med sekunder, som modeller ofta skriver. Sekunderna används inte. */
+export const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::\d{2})?)?$/;
 export interface BookingStatus {
   /** "krävs": arrangören kräver bokning. "kanske": det finns bokningsuppgifter men inget besked om krav. "ej": drop-in. */
   state: "krävs" | "kanske" | "ej";

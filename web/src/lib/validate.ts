@@ -68,8 +68,12 @@ function checkItem(it: unknown, i: number, errors: string[]): void {
     if (!isObj(b)) errors.push(`${at}.booking är inget objekt`);
     else {
       if (b.required !== undefined && b.required !== null && !oneOf(YES_NO, b.required)) errors.push(`${at}.booking.required måste vara ja, nej eller oklart`);
-      if (b.opensAt !== undefined && b.opensAt !== null && !(isStr(b.opensAt) && BOOKING_OPENS.test(b.opensAt) && isIsoDate(b.opensAt.slice(0, 10)) && (b.opensAt.length === 10 || validTime(b.opensAt.slice(11))))) errors.push(`${at}.booking.opensAt måste vara YYYY-MM-DD eller YYYY-MM-DDTHH:MM`);
-      if (b.url !== undefined && b.url !== null && !safeUrl(b.url)) errors.push(`${at}.booking.url måste vara en http(s)-adress`);
+      // Tom text betyder okänt, precis som null: den får inte fälla en hel körning.
+      if (b.opensAt !== undefined && b.opensAt !== null && b.opensAt !== "") {
+        const m = isStr(b.opensAt) ? BOOKING_OPENS.exec(b.opensAt) : null;
+        if (!m || !isIsoDate(m[1]) || (m[2] !== undefined && !validTime(m[2]))) errors.push(`${at}.booking.opensAt måste vara YYYY-MM-DD eller YYYY-MM-DDTHH:MM`);
+      }
+      if (b.url !== undefined && b.url !== null && b.url !== "" && !safeUrl(b.url)) errors.push(`${at}.booking.url måste vara en http(s)-adress`);
       // En lång anteckning kortas vid visning. Den får inte fälla en hel körning.
       if (b.note !== undefined && b.note !== null && !isStr(b.note)) errors.push(`${at}.booking.note måste vara text eller null`);
     }

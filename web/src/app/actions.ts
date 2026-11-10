@@ -65,7 +65,9 @@ export async function rate(input: { key: string; runId: string; itemId: string; 
   revalidatePath("/");
 }
 
-export type RequestState = { error?: string; ok?: boolean; direct?: boolean; located?: string | null } | null;
+/** Hur det gick att hitta adressen på kartan: hittad (med vilken träff), ingen träff, eller karttjänsten svarade inte. */
+export type Located = { status: "ok"; label: string } | { status: "none" | "failed" };
+export type RequestState = { error?: string; ok?: boolean; direct?: boolean; located?: Located } | null;
 
 /** Sparar en beställning. "Sök nu" startar direktsökningen efter svaret, så sidan inte väntar på den. */
 export async function createRequest(_prev: RequestState, form: FormData): Promise<RequestState> {
@@ -89,6 +91,7 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   let cityId: string | null = null;
   let place: { name: string; address?: string; lat?: number; lng?: number } | null = null;
   let origin: { name: string; address?: string; lat?: number; lng?: number } | null = null;
+  let located: Located | undefined;
   if (where === "gps") {
     if (!hasGps) return { error: "Tryck på Använd där jag är nu först." };
     const address = String(form.get("address") ?? "").trim().slice(0, 120);
@@ -97,11 +100,14 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   } else if (where === "plats") {
     if (!placeName) return { error: "Skriv en adress eller ort." };
     // Koordinater från servern, så att restid kan räknas direkt och sökningen får en exakt mittpunkt.
-    // Ingen träff eller inget svar: beställningen går vidare utan koordinater, som förut.
-    const { hit } = await geocode(placeName);
-    const coords = hit ? { lat: hit.lat, lng: hit.lng } : {};
-    place = { name: placeName, address: hit?.label || placeName, ...coords };
-    origin = { name: placeName, address: hit?.label || placeName, ...coords };
+    // En tvetydig adress stoppas här, innan något sparas eller en betald sökning startar. Ingen träff eller
+    // inget svar från karttjänsten: beställningen går vidare utan koordinater, och sökningen tar reda på platsen.
+    const geo = await geocode(placeName);
+    if (geo.ambiguous) return { error: `"${placeName}" finns på flera orter. Skriv orten också, t.ex. "${placeName}, Växjö".` };
+    const coords = geo.hit ? { lat: geo.hit.lat, lng: geo.hit.lng } : {};
+    place = { name: placeName, address: geo.hit?.label || placeName, ...coords };
+    origin = { name: placeName, address: geo.hit?.label || placeName, ...coords };
+    located = geo.hit ? { status: "ok", label: geo.hit.label || placeName } : { status: geo.failed ? "failed" : "none" };
   } else {
     if (!isValidId(city)) return { error: "Välj stad." };
     cityId = city;
@@ -112,7 +118,7 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   });
   if (mode === "direkt") after(() => runDirectSearch(req.id));
   revalidatePath("/bestall");
-  return { ok: true, direct: mode === "direkt", ...(where === "plats" ? { located: place?.lat != null ? (place.address ?? null) : null } : {}) };
+  return { ok: true, direct: mode === "direkt", ...(located ? { located } : {}) };
 }
 
 /** Sparar familjens profil från Familj-sidan. Samma kontroll som importen. */

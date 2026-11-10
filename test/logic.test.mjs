@@ -307,6 +307,8 @@ test("förbokning: krävs, öppnar senare, oklart och drop-in", () => {
   assert.equal(st({ required: "ja", url: "javascript:alert(1)" }).url, null);
   assert.equal(st({ required: "ja", note: "x".repeat(500) }).note.length, 300);
   assert.equal(st({ required: "ja", note: null }).note, "");
+  assert.equal(st({ required: "oklart", opensAt: "", url: "", note: "" }), null, "tom text är okänt");
+  assert.deepEqual([st({ required: "ja", opensAt: "2026-11-12T09:00:00" }).opensDate, st({ required: "ja", opensAt: "2026-11-12T09:00:00" }).opensTime], ["2026-11-12", "09:00"]);
 });
 
 test("schema: inomhus går före när regn väntas, och okänt väder ändrar inget", () => {
