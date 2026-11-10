@@ -50,7 +50,7 @@ export type Travel = Partial<Record<Mode, Leg>>;
 
 export interface DayEntry { date: string; from?: string; to?: string; adult?: number | null }
 /** Förbokning: om den krävs, när bokningen öppnar ("YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM", svensk tid) och var man bokar. */
-export interface Booking { required?: YesNo; opensAt?: string | null; url?: string | null; note?: string }
+export interface Booking { required?: YesNo | null; opensAt?: string | null; url?: string | null; note?: string | null }
 
 export interface Item {
   id: string;
@@ -189,20 +189,28 @@ export function ageFitFor(item: Item, children: Child[] | undefined, date: strin
 
 export const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
 export interface BookingStatus {
-  /** "krävs": boka nu. "öppnar": krävs, men bokningen har inte öppnat. "kanske": oklart om det krävs. "ej": drop-in. */
-  state: "krävs" | "öppnar" | "kanske" | "ej";
+  /** "krävs": arrangören kräver bokning. "kanske": det finns bokningsuppgifter men inget besked om krav. "ej": drop-in. */
+  state: "krävs" | "kanske" | "ej";
+  /** Bokningen har inte öppnat än: öppnar en senare dag, eller idag på ett angivet klockslag. */
+  opensLater: boolean;
+  /** Bokningen öppnade en tidigare dag. */
+  opened: boolean;
   opensDate: string | null; opensTime: string | null; url: string | null; note: string;
 }
-/** Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte. */
+/**
+ * Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte.
+ * Bara "oklart" utan öppningstid, länk eller anteckning räknas som okänt.
+ */
 export function bookingStatus(item: Pick<Item, "booking">, today: string): BookingStatus | null {
   const b = item.booking;
-  if (!b || (b.required == null && !b.opensAt && !b.url && !b.note)) return null;
+  if (!b) return null;
   const m = BOOKING_OPENS.exec(b.opensAt ?? "");
   const opensDate = m?.[1] ?? null, opensTime = m?.[2] ?? null;
-  const base = { opensDate, opensTime, url: safeUrl(b.url), note: b.note ?? "" };
-  if (b.required === "nej") return { ...base, state: "ej" };
-  if (b.required !== "ja") return { ...base, state: "kanske" };
-  return { ...base, state: opensDate != null && opensDate > today ? "öppnar" : "krävs" };
+  const url = safeUrl(b.url), note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 300);
+  const state = b.required === "ja" ? "krävs" : b.required === "nej" ? "ej" : "kanske";
+  if (state === "kanske" && !opensDate && !url && !note) return null;
+  const opensLater = opensDate != null && (opensDate > today || (opensDate === today && opensTime != null));
+  return { state, opensLater, opened: opensDate != null && opensDate < today, opensDate, opensTime, url, note };
 }
 
 // ---------- Cost ----------

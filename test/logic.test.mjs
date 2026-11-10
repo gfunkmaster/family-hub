@@ -286,14 +286,25 @@ test("dagsplanen: fasta evenemang, tupplurar och lunch krockar aldrig", () => {
 
 test("förbokning: krävs, öppnar senare, oklart och drop-in", () => {
   const today = "2026-11-10";
+  const st = (booking) => L.bookingStatus({ booking }, today);
   assert.equal(L.bookingStatus({}, today), null, "inget känt ger inget besked");
-  assert.equal(L.bookingStatus({ booking: {} }, today), null);
-  assert.equal(L.bookingStatus({ booking: { required: "ja" } }, today).state, "krävs");
-  const later = L.bookingStatus({ booking: { required: "ja", opensAt: "2026-11-12T09:00", url: "https://boka.example/x" } }, today);
-  assert.deepEqual([later.state, later.opensDate, later.opensTime, later.url], ["öppnar", "2026-11-12", "09:00", "https://boka.example/x"]);
-  assert.equal(L.bookingStatus({ booking: { required: "ja", opensAt: "2026-11-10" } }, today).state, "krävs", "öppnar idag = boka nu");
-  assert.equal(L.bookingStatus({ booking: { required: "oklart" } }, today).state, "kanske");
-  assert.equal(L.bookingStatus({ booking: { url: "https://boka.example/x" } }, today).state, "kanske", "länk utan besked är inget krav");
-  assert.equal(L.bookingStatus({ booking: { required: "nej" } }, today).state, "ej");
-  assert.equal(L.bookingStatus({ booking: { required: "ja", url: "javascript:alert(1)" } }, today).url, null);
+  assert.equal(st({}), null);
+  assert.equal(st({ required: "oklart" }), null, "bara oklart är okänt och visas inte");
+  assert.equal(st({ required: "oklart", opensAt: null, url: null, note: null }), null);
+  assert.equal(st({ required: "ja" }).state, "krävs");
+  const later = st({ required: "ja", opensAt: "2026-11-12T09:00", url: "https://boka.example/x" });
+  assert.deepEqual([later.state, later.opensLater, later.opened, later.opensDate, later.opensTime, later.url], ["krävs", true, false, "2026-11-12", "09:00", "https://boka.example/x"]);
+  const sameDay = st({ required: "ja", opensAt: "2026-11-10T09:00" });
+  assert.deepEqual([sameDay.opensLater, sameDay.opened], [true, false], "öppnar idag på ett klockslag: aldrig 'öppnade'");
+  const sameDate = st({ required: "ja", opensAt: "2026-11-10" });
+  assert.deepEqual([sameDate.opensLater, sameDate.opened], [false, false], "öppnar idag utan klockslag: boka nu");
+  const past = st({ required: "ja", opensAt: "2026-11-03" });
+  assert.deepEqual([past.opensLater, past.opened], [false, true]);
+  const maybe = st({ required: "oklart", opensAt: "2026-11-12" });
+  assert.deepEqual([maybe.state, maybe.opensLater, maybe.opened], ["kanske", true, false], "framtida öppning utan besked om krav är ändå en öppning");
+  assert.equal(st({ url: "https://boka.example/x" }).state, "kanske", "länk utan besked är inget krav");
+  assert.equal(st({ required: "nej" }).state, "ej");
+  assert.equal(st({ required: "ja", url: "javascript:alert(1)" }).url, null);
+  assert.equal(st({ required: "ja", note: "x".repeat(500) }).note.length, 300);
+  assert.equal(st({ required: "ja", note: null }).note, "");
 });

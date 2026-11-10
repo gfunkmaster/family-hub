@@ -294,7 +294,7 @@ function Card({ s, runId, date, from, area, today, past = false, compact = false
   const booking = past ? null : bookingStatus(it, today);
   const opensTxt = booking?.opensDate ? `${dayName(booking.opensDate)}${booking.opensTime ? ` kl. ${booking.opensTime}` : ""}` : "";
   // Påminnelse i kalendern den dag bokningen öppnar.
-  const bookCal = booking?.state === "öppnar" && booking.opensDate ? calendarUrl({
+  const bookCal = booking?.opensLater && booking.opensDate ? calendarUrl({
     title: `Boka: ${it.title}`, date: booking.opensDate,
     ...(booking.opensTime ? { start: booking.opensTime, durationMin: 15 } : {}),
     details: [`Bokningen öppnar för ${it.title} (${dayName(date)}).`, booking.url].filter(Boolean).join("\n"),
@@ -319,13 +319,14 @@ function Card({ s, runId, date, from, area, today, past = false, compact = false
         <span className={`chip ${levelClass(fit.level)}`}>Ålder: {fit.level}</span>
         <span className="chip"><span className="cost">{costTxt}</span></span>
         {it.verified ? <span className="chip good">Verifierad</span> : <span className="chip ghost">Ej verifierad</span>}
-        {booking?.state === "krävs" || booking?.state === "öppnar" ? <span className="chip warn">Förbokning krävs</span> : null}
+        {booking?.state === "krävs" ? <span className="chip warn">Förbokning krävs</span> : null}
         {booking?.state === "ej" ? <span className="chip good">Drop-in</span> : null}
       </div>
       {booking && booking.state !== "ej" ? (
         <p className="note booking">
-          {booking.state === "krävs" ? <b>Boka i förväg.</b> : booking.state === "öppnar" ? <b>Bokningen öppnar {opensTxt}.</b> : <b>Förbokning kan krävas.</b>}
-          {booking.state !== "öppnar" && opensTxt ? ` Bokningen öppnade ${opensTxt}.` : ""}
+          <b>{booking.opensLater ? `Bokningen öppnar ${opensTxt}.` : booking.state === "krävs" ? "Boka i förväg." : "Förbokning kan krävas."}</b>
+          {booking.opensLater && booking.state === "kanske" ? " Oklart om bokning krävs." : ""}
+          {booking.opened ? ` Bokningen öppnade ${opensTxt}.` : ""}
           {booking.note ? ` ${booking.note}` : ""}
           {booking.url ? <> <a href={booking.url} target="_blank" rel="noopener noreferrer">Till bokningen</a></> : null}
           {bookCal ? <> · <a href={bookCal} target="_blank" rel="noopener noreferrer">Påminn mig i kalendern</a></> : null}
