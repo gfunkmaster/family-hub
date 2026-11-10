@@ -3,7 +3,7 @@
  * restid och åldersmatchning, räknat från vald utgångspunkt. Ren logik.
  */
 import {
-  activeDays, schedulePeriod, slug, ageMonths, autoPlan, nearestFood, packedFor, ageFitFor, dayEntry, familyCost, ratingKey, scoreItem, tagWeightsFrom, tierFor, travelFor,
+  activeDays, hasCoords, isoWeek, schedulePeriod, slug, weekStart, ageMonths, autoPlan, nearestFood, packedFor, ageFitFor, dayEntry, familyCost, ratingKey, scoreItem, tagWeightsFrom, tierFor, travelFor,
   type Block, type City, type FoodSpot, type Item, type Level, type Mode, type Origin, type PackedFood, type Profile, type Rating, type Tier,
 } from "@family-hub/logic";
 
@@ -95,12 +95,16 @@ export function suggestionsByDay(run: RunView, profile: Profile, city: City, ori
   });
 }
 
-export interface ScheduleDay { date: string; weather: Weather | null; pick: Suggestion | null; alts: Suggestion[] }
-export interface Schedule { days: ScheduleDay[]; freeDays: number; total: number; unknownCost: boolean }
+export interface ScheduleDay { date: string; weather: Weather | null; pick: Suggestion | null; alts: Suggestion[]; why: string[]; overBudget: boolean }
+/** Summan för en vecka (måndag–söndag) i schemat. `budget` är profilens veckobudget, eller null utan gräns. */
+export interface ScheduleWeek { from: string; week: number; total: number; unknownCost: boolean; budget: number | null }
+export interface Schedule { days: ScheduleDay[]; weeks: ScheduleWeek[]; freeDays: number; total: number; unknownCost: boolean }
 
 /**
  * Schema för en vecka eller månad: en huvudaktivitet per ledig dag, aldrig samma förslag två dagar i rad
  * eller med bara en dag emellan (`gap`), och inget som inte passar åldern. Dagar utan förslag är vilodagar.
+ * Regn väntas: inomhus går före. Återkommande pass hålls på samma veckodag. Med veckobudget i profilen väljs
+ * bara det som ryms i veckan; okända priser räknas inte mot budgeten, de markeras.
  */
 export function scheduleFor(run: RunView, profile: Profile, city: City, origin: Origin | null, ratingList: StoredRating[], gap = 2): Schedule {
   const ratings = Object.fromEntries(ratingList.map((r) => [r.key, r]));
@@ -113,16 +117,26 @@ export function scheduleFor(run: RunView, profile: Profile, city: City, origin: 
     return v;
   };
   const free = activeDays(run.dates, profile);
-  const plan = schedulePeriod(run.items, free, (it, d) => sug(it, d).score, { gap });
-  const days = plan.map((x) => ({ date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick: x.pick ? sug(x.pick, x.date) : null, alts: x.alts.map((a) => sug(a, x.date)) }));
+  const budget = profile.weekBudget ?? null;
+  const plan = schedulePeriod(run.items, free, (it, d) => sug(it, d).score, { gap, weather: run.weather, weekBudget: budget, costFn: (it, d) => sug(it, d).cost.total });
+  const days = plan.map((x) => ({ date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick: x.pick ? sug(x.pick, x.date) : null, alts: x.alts.map((a) => sug(a, x.date)), why: x.why, overBudget: x.overBudget }));
+  const weeks: ScheduleWeek[] = [];
+  for (const d of days) {
+    const from = weekStart(d.date);
+    let w = weeks.find((x) => x.from === from);
+    if (!w) { w = { from, week: isoWeek(d.date), total: 0, unknownCost: false, budget }; weeks.push(w); }
+    if (d.pick) { w.total += d.pick.cost.total ?? 0; if (d.pick.cost.total == null) w.unknownCost = true; }
+  }
   const picks = days.flatMap((d) => (d.pick ? [d.pick] : []));
-  return { days, freeDays: free.length, total: picks.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: picks.some((p) => p.cost.total == null) };
+  return { days, weeks, freeDays: free.length, total: picks.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: picks.some((p) => p.cost.total == null) };
 }
 
 /** Nyckeln som förslag och betyg grupperas på: staden, eller platsen för en sökning var som helst. */
 export function runKey(cityId: string | null, place: { name?: string } | null, id: string): string {
   return cityId ?? `plats-${slug(place?.name ?? id)}`;
 }
+
+const modeWord = (m: Mode) => (m === "car" ? "bil" : m === "transit" ? "kollektivt" : "promenad");
 
 export interface MealOptions { near: (FoodSpot & { distanceKm: number | null })[]; nearTitle: string | null; packed: PackedFood[] }
 export interface DayPlan { date: string; blocks: (Block & { meal?: MealOptions })[]; items: Item[]; missing: string[]; youngestMonths: number | null }
@@ -135,11 +149,17 @@ export function dayPlanFor(run: RunView, profile: Profile, city: City, origin: O
   const chosen = itemIds.map((id) => run.items.find((i) => i.id === id)).filter((i): i is Item => !!i);
   const missing = itemIds.filter((id) => !chosen.some((i) => i.id === id));
   const items = chosen.filter((i) => dayEntry(i, date) || !(i.dates ?? []).length);
-  const withTravel = items.map((i) => { const t = travelFor(i, city, origin); return { ...i, _travelMin: t?.min ?? undefined, _travelNote: t ? `${t.mode === "car" ? "bil" : t.mode === "transit" ? "kollektivt" : "promenad"}${t.estimated ? ", uppskattat" : ""}` : undefined }; });
+  const withTravel = items.map((i) => { const t = travelFor(i, city, origin); return { ...i, _travelMin: t?.min ?? undefined, _travelNote: t ? `${modeWord(t.mode)}${t.estimated ? ", uppskattat" : ""}` : undefined }; });
   const ages = (profile.children ?? []).map((c) => ageMonths(c.birthdate, date));
   const youngest = ages.length ? Math.min(...ages) : null;
   const packed = youngest == null ? run.packed : packedFor(run.packed, youngest);
-  const blocks = autoPlan(withTravel, profile, date).map((b, idx, all) => {
+  // Mellan två aktiviteter räknas resan från den förra, inte hemifrån. Kräver koordinater på båda; annars gäller restiden hemifrån.
+  const travelBetween = (a: Item, b: Item) => {
+    if (!hasCoords(a) || !hasCoords(b)) return null;
+    const t = travelFor(b, city, { name: a.title, lat: a.lat, lng: a.lng });
+    return t?.min != null ? { min: t.min, note: `${modeWord(t.mode)} från ${a.title}, uppskattat` } : null;
+  };
+  const blocks = autoPlan(withTravel, profile, date, { travelBetween, homeTrip: true }).map((b, idx, all) => {
     if (b.kind !== "mat" && !/lunch|mat|middag/i.test(b.title)) return b;
     // Aktiviteten närmast måltiden: den före, annars den efter.
     const before = [...all.slice(0, idx)].reverse().find((x) => x.itemId);

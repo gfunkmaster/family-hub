@@ -136,3 +136,29 @@ test("dagens datum räknas i svensk tid", async () => {
   assert.equal(stockholmToday(new Date("2026-11-09T23:30:00Z")), "2026-11-10", "00:30 in Stockholm is already the next day");
   assert.equal(stockholmToday(new Date("2026-06-30T21:59:00Z")), "2026-06-30", "summer time, 23:59 in Stockholm");
 });
+
+test("schema: veckosummor mot veckobudget, och regn väljer inomhus", () => {
+  const sch = scheduleFor(run, profile, city, null, []);
+  assert.deepEqual(sch.weeks.map((w) => [w.from, w.week, w.budget]), [["2026-11-09", 46, null]]);
+  assert.equal(sch.weeks[0]?.total, sch.total);
+  // Blubb kostar 300 kr entré plus resa. Med 100 kr i veckan ryms bara den fria öppna förskolan (med mellandagar).
+  const tight = scheduleFor(run, { ...profile, weekBudget: 100 }, city, null, []);
+  assert.ok(tight.days.every((d) => d.pick?.item.id !== "far"), "Blubb ryms inte i veckobudgeten");
+  assert.ok(tight.days.some((d) => d.overBudget), "en dag där det enda kvarvarande förslaget är för dyrt markeras");
+  assert.equal(tight.weeks[0]?.budget, 100);
+  assert.ok((tight.weeks[0]?.total ?? 0) <= 100);
+  const indoor: RunView = { ...run, weather: [{ date: "2026-11-10", high: 4, low: 1, precipMm: 6 }], items: run.items.map((i) => (i.id === "far" ? { ...i, indoor: true } : i.id === "near" ? { ...i, indoor: false } : i)) };
+  const tue = scheduleFor(indoor, profile, city, null, [], 0).days.find((d) => d.date === "2026-11-10");
+  assert.equal(tue?.pick?.item.id, "far");
+  assert.deepEqual(tue?.why, ["Inomhus: regn väntas"]);
+});
+
+test("dagsplan: resan mellan aktiviteterna räknas från den förra, och hem från den sista", () => {
+  const p = dayPlanFor(run, { ...profile, naps: [] }, city, { name: "Hemma", lat: 59.3503, lng: 17.9965 }, "2026-11-10", ["near", "far"]);
+  const trips = p.blocks.filter((b) => b.kind === "resa");
+  assert.deepEqual(trips.map((t) => t.title), ["Resa", "Resa", "Resa hem"]);
+  assert.match(trips[1]?.note ?? "", /från Öppna förskolan, uppskattat$/);
+  const noCoords: RunView = { ...run, items: run.items.map((i) => (i.id === "far" ? { ...i, lat: undefined, lng: undefined } : i)) };
+  const q = dayPlanFor(noCoords, { ...profile, naps: [] }, city, null, "2026-11-10", ["near", "far"]);
+  assert.doesNotMatch(q.blocks.filter((b) => b.kind === "resa")[1]?.note ?? "", /från Öppna förskolan/, "utan koordinater gäller sökningens restid hemifrån");
+});

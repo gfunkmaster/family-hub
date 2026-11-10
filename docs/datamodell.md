@@ -10,6 +10,7 @@ Regler: alla inloggade som appen delas med kan läsa, och bara ägaren skriver (
 | --- | --- | --- |
 | `adults` | number | Antal vuxna |
 | `budgetMax` | number \| null | Maxkostnad per dag för hela familjen, inklusive resa |
+| `weekBudget` | number \| null | Maxkostnad per vecka (måndag–söndag) för schemats aktiviteter. Bara på hemsidan. `null` = ingen gräns |
 | `children` | `{id, name, birthdate, approx?}[]` | Födelsedatum `YYYY-MM-DD`. Åldern räknas fram per datum |
 | `naps` | `{from, to}[]` | Sovtider `HH:MM` |
 | `needs` | `{stroller, changing}` | Vagn och skötrum |
