@@ -20,7 +20,7 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 ## P2: Funktioner
 
 10. **"Här nu" och delade kartlänkar.** Ett fält under Förslag som tar koordinater eller en delad länk från Google Maps eller Apple Kartor. Dessutom ett flöde i chatten: "använd min plats" sparar telefonens position som "Här nu".
-11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Påminnelse när förbokning öppnar finns. Kvar: sparade scheman som flera händelser.
+11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Påminnelse när förbokning öppnar finns, och varje val i ett sparat schema kan läggas i kalendern. Kvar: hela schemat som en enda fil (ICS).
 12. **Uppdatera vädret närmare dagen.** Vid månadskörningar saknas väder längre fram. En lätt körning dagen innan kan fylla på.
 13. ~~Bättre schemaläggning.~~ Klart på hemsidan: veckobudget, inomhus vid regn, fasta veckodagar för återkommande pass, och restid mellan aktiviteter i dagsplanen.
 
@@ -41,7 +41,7 @@ Grunden finns: inloggning, Förslag med GPS, Beställ, betyg och agentens API. K
 21. **Flytta data från appen.** Importen i steg 4.
 22. **Byt den schemalagda körningen till sidans API.** Steg 5.
 23. **Familj-sidan.** Klar (`/familj`).
-24. **Schema för vecka och månad.** Vyn Schema finns under Förslag. Kvar: att spara ett schema, och att välja flera förslag till samma dag (`/plan` tar redan upp till fyra `item`).
+24. **Schema för vecka och månad.** Klar: vyn Schema under Förslag, där schemat går att ändra (upp till fyra förslag per dag), spara och återställa.
 25. **Städer och källor.** Klar (`/stader`).
 26. **Installera som app.** Klar: manifest, SVG-ikon och PNG-ikoner.
 27. **Stäng artifacten.** När 20–25 är klara: ta bort `src/app.js`, `dist/` och artifact-bygget.
