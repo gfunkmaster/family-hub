@@ -189,8 +189,10 @@ function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { sched
   // En ändring fryser hela schemat som det visas, så att de andra dagarna inte räknas om under en.
   const edit = (date: string, ids: string[]) => { setErrors([]); onChange(scheduleToSaved(schedule).map((d) => (d.date === date ? { date, itemIds: ids } : d))); };
   const save = () => start(async () => {
-    const res = await saveSchedule(runId, scheduleToSaved(schedule));
-    if (res.ok) { setErrors([]); onChange(null); } else setErrors(res.errors);
+    try {
+      const res = await saveSchedule(runId, scheduleToSaved(schedule));
+      if (res.ok) { setErrors([]); onChange(null); } else setErrors(res.errors);
+    } catch { setErrors(["Schemat kunde inte sparas just nu. Försök igen."]); }
   });
   const reset = () => start(async () => {
     try { await clearSchedule(runId); setErrors([]); onChange(null); } catch { setErrors(["Schemat kunde inte tas bort just nu. Försök igen."]); }
