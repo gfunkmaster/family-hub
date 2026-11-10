@@ -22,7 +22,7 @@ Ordnat efter vad som behövs för att appen ska fungera fullt ut. Varje punkt fi
 10. **"Här nu" och delade kartlänkar.** Ett fält under Förslag som tar koordinater eller en delad länk från Google Maps eller Apple Kartor. Dessutom ett flöde i chatten: "använd min plats" sparar telefonens position som "Här nu".
 11. **Lägg aktiviteter i kalendern.** Delvis klart på hemsidan: "Lägg i kalendern" öppnar ett ifyllt utkast i Google Kalender. Påminnelse när förbokning öppnar finns. Kvar: sparade scheman som flera händelser.
 12. **Uppdatera vädret närmare dagen.** Vid månadskörningar saknas väder längre fram. En lätt körning dagen innan kan fylla på.
-13. **Bättre schemaläggning.** Ta hänsyn till veckobudget, inomhus vid regn, att återkommande pass gärna blir fasta veckodagar, och restid mellan aktiviteter.
+13. ~~Bättre schemaläggning.~~ Klart på hemsidan: veckobudget, inomhus vid regn, fasta veckodagar för återkommande pass, och restid mellan aktiviteter i dagsplanen.
 
 ## P3: Teknik
 

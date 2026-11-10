@@ -20,6 +20,8 @@ export interface Place { id: string; name?: string; address?: string; city?: str
 export interface Profile {
   adults?: number;
   budgetMax?: number | null;
+  /** Högsta kostnad per vecka (måndag–söndag) för schemats aktiviteter, inklusive resa. Null eller saknas: ingen gräns. */
+  weekBudget?: number | null;
   children?: Child[];
   naps?: Nap[];
   needs?: { stroller?: boolean; changing?: boolean };
@@ -122,6 +124,12 @@ export function fmtPrecip(w: Weather | null | undefined, long = false): string {
   if (w.precip != null) return svNum(w.precip) + " %" + (long ? " risk för nederbörd" : "");
   return "";
 }
+/** Väntas regn enligt prognosen? Minst 1 mm eller minst 50 % risk. Okänt väder är inte regn. */
+export function isRainy(w: Weather | null | undefined): boolean {
+  if (!w) return false;
+  const mm = typeof w.precipMm === "number" ? w.precipMm : null, pct = typeof w.precip === "number" ? w.precip : null;
+  return (mm != null && mm >= 1) || (pct != null && pct >= 50);
+}
 export interface Clothing { headline: string; items: string[] }
 const numOrNull = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
 /**
@@ -141,7 +149,7 @@ export function clothingFor(w: Weather | null | undefined, youngestMonths?: numb
   else { headline = "Mycket kallt: håll pauserna korta"; items.push("Tjockt underställ av ull, fleece och en varm overall", "Mössa, halsvärmare, vantar och varma, torra strumpor", "Skyddskräm i ansiktet, åkpåse i vagnen och byt till torra kläder vid behov", "Planera korta utomhuspass med inomhuspauser"); }
   if (hi - lo >= 8) items.push("Stor skillnad mellan morgon och eftermiddag: klä i lager som går att ta av");
   const mm = numOrNull(w.precipMm), pct = numOrNull(w.precip);
-  if ((mm != null && mm >= 1) || (pct != null && pct >= 50)) items.push("Regn väntas: regnjacka och regnbyxor, och gummistövlar eller vattentäta skor", "Regnskydd till vagnen och torra kläder i väskan");
+  if (isRainy(w)) items.push("Regn väntas: regnjacka och regnbyxor, och gummistövlar eller vattentäta skor", "Regnskydd till vagnen och torra kläder i väskan");
   else if ((mm != null && mm > 0) || (pct != null && pct >= 30)) items.push("Risk för skurar: ett regnskal i väskan");
   if (youngestMonths != null && youngestMonths < 12 && hi < 22) items.push("Bebis i vagn: ett lager mer än du själv. Känn i nacken: svettig är för varmt, kall är för kallt");
   return { headline, items };
@@ -370,7 +378,14 @@ export interface Block { start: number; end: number; kind: BlockKind; title: str
 export type PlanItem = Item & { _travelMin?: number; _travelNote?: string };
 
 /** Deterministic day plan around nap windows and opening hours. */
-export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts?: { dayStart?: string; dayEnd?: string; lunch?: string }): Block[] {
+export interface PlanOpts {
+  dayStart?: string; dayEnd?: string; lunch?: string;
+  /** Restid från föregående aktivitet till nästa. Utan den (eller vid null) används aktivitetens restid hemifrån. */
+  travelBetween?: (from: PlanItem, to: PlanItem) => { min: number; note?: string } | null;
+  /** Lägg till resan tillbaka till utgångspunkten efter dagens sista aktivitet. */
+  homeTrip?: boolean;
+}
+export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts?: PlanOpts): Block[] {
   const o = { dayStart: "09:00", dayEnd: "17:30", lunch: "11:45", ...opts };
   const dayStart = toMin(o.dayStart) ?? 540, end = toMin(o.dayEnd) ?? 1050, lunchAt = toMin(o.lunch) ?? 705;
   const naps = (profile.naps ?? [])
@@ -388,8 +403,12 @@ export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts
   const queue = items
     .map((it) => { const d = dayEntry(it, date); const open = toMin(d?.from); return { it, open: open ?? cur, close: toMin(d?.to) ?? end, dur: it.durationMin ?? 90, trav: it._travelMin ?? 0, fixed: it.kind === "event" && open != null }; })
     .sort((a, b) => a.open - b.open);
+  let prev: PlanItem | null = null;
   for (const q of queue) {
-    const leave = q.open - q.trav;
+    // Efter dagens första aktivitet räknas resan från den förra aktiviteten, inte hemifrån.
+    const hop = prev && o.travelBetween ? o.travelBetween(prev, q.it) : null;
+    const trav = hop ? hop.min : q.trav, travNote = hop ? hop.note ?? "" : q.it._travelNote ?? "";
+    const leave = q.open - trav;
     const napNotes: string[] = [];
     const napNote = (t: string) => { if (!napNotes.includes(t)) napNotes.push(t); };
     for (const n of naps) {
@@ -410,7 +429,7 @@ export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts
       if (n) { blocks.push({ start: Math.max(cur, n.from), end: n.to, kind: "vila", title: "Tupplur + lunch", note: "Ät medan barnet sover i vagnen" }); cur = n.to; n.used = true; lunchDone = true; }
       else if (room >= 45) { blocks.push({ start: cur, end: cur + 45, kind: "mat", title: "Lunch", note: "" }); cur += 45; lunchDone = true; }
     }
-    let start = Math.max(cur + q.trav, q.open);
+    let start = Math.max(cur + trav, q.open);
     let fin = start + q.dur;
     const clash = naps.find((n) => !n.used && start < n.to && fin > n.from);
     if (clash && q.fixed) {
@@ -422,15 +441,22 @@ export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts
       }
     } else if (clash) {
       if (clash.from - start >= 45) fin = clash.from;
-      else { cur = Math.max(cur, clash.from); takeNap(clash); start = Math.max(cur + q.trav, q.open); fin = start + q.dur; }
+      else { cur = Math.max(cur, clash.from); takeNap(clash); start = Math.max(cur + trav, q.open); fin = start + q.dur; }
     }
     if (fin > q.close) fin = q.close;
     if (start >= fin || fin > end) { blocks.push({ start: cur, end: cur, kind: "info", title: q.it.title, note: "Får inte plats i dagen" }); continue; }
-    if (q.trav > 0) blocks.push({ start: start - q.trav, end: start, kind: "resa", title: "Resa", note: q.it._travelNote ?? "" });
+    if (trav > 0) blocks.push({ start: start - trav, end: start, kind: "resa", title: "Resa", note: travNote });
     blocks.push({ start, end: fin, kind: "aktivitet", title: q.it.title, itemId: q.it.id, note: [q.it.venue, ...napNotes].filter(Boolean).join(". ") });
-    cur = fin;
+    cur = fin; prev = q.it;
   }
-  for (const n of naps) if (!n.used && n.from >= cur && n.to <= end) takeNap(n);
+  // Resan tillbaka till utgångspunkten, med samma restid som dit. En tupplur som börjar under resan
+  // försvinner inte: den börjar när resan är slut.
+  const back = prev?._travelMin ?? 0, backFrom = cur;
+  if (o.homeTrip && prev && back > 0) {
+    blocks.push({ start: cur, end: cur + back, kind: "resa", title: "Resa tillbaka", note: prev._travelNote ?? "" });
+    cur += back;
+  }
+  for (const n of naps) if (!n.used && n.from >= backFrom && n.to <= end) takeNap(n);
   if (!lunchDone && lunchAt >= dayStart) {
     // Upptaget vid lunchtid: lunch direkt efter det som pågår, så att dagen alltid har en måltid.
     let at = lunchAt;
@@ -486,15 +512,57 @@ export function periodOptions(now: Date, kind: PeriodKind | string): { from: str
   }
   return out;
 }
-/** One main activity per free day: best score that day, not the same item within `gap` days, never one that does not fit the age. */
-export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item, date: string) => number, opts?: { gap?: number }) {
-  const gap = opts?.gap ?? 2, lastUsed: Record<string, number> = {};
+export interface ScheduleOpts {
+  gap?: number;
+  /** Familjens kända kostnad för förslaget den dagen. Null när den är okänd: då räknas den inte mot budgeten. */
+  costFn?: (it: Item, date: string) => number | null;
+  /** Högsta kända kostnad per vecka (måndag–söndag). Null: ingen gräns. */
+  weekBudget?: number | null;
+  weather?: Weather[];
+}
+export interface ScheduledDay {
+  date: string; pick: Item | null; alts: Item[];
+  /** Varför dagen ser ut som den gör, t.ex. "Inomhus: regn väntas". */
+  why: string[];
+  /** Det fanns förslag, men inget rymdes i veckans budget. */
+  overBudget: boolean;
+}
+/** Måndagen i datumets vecka (YYYY-MM-DD). */
+export function weekStart(iso: string): string { return addDays(iso, -((parseDate(iso).getDay() + 6) % 7)); }
+/**
+ * One main activity per free day: best score that day, not the same item within `gap` days, never one that does not fit the age.
+ * Regn väntas: det som är utomhus väljs bara om inget annat passar. Ett återkommande pass hålls helst kvar på veckodagen det först fick.
+ * Med `weekBudget` väljs bara det som ryms i det som är kvar av veckan; okända priser räknas inte, de gissas aldrig.
+ */
+export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item, date: string) => number, opts?: ScheduleOpts): ScheduledDay[] {
+  const gap = opts?.gap ?? 2, lastUsed: Record<string, number> = {}, weekdayOf: Record<string, number> = {}, spent: Record<string, number> = {};
+  const budget = opts?.weekBudget ?? null;
   return days.map((d, i) => {
-    const cands = items.filter((it) => dayEntry(it, d)).map((it) => ({ it, score: scoreFn(it, d) })).filter((c) => c.score > -3).sort((a, b) => b.score - a.score);
+    const rain = isRainy(opts?.weather?.find((w) => w.date === d)), weekday = parseDate(d).getDay(), week = weekStart(d);
+    const cands = items.filter((it) => dayEntry(it, d)).map((it) => {
+      const base = scoreFn(it, d);
+      let score = base;
+      if (rain && it.indoor === true) score += 1;
+      if (weekdayOf[it.id] === weekday) score += 1.5;
+      // Regn: det som är utomhus hamnar efter allt annat, oavsett poäng. Okänt (indoor saknas) räknas inte som utomhus.
+      return { it, base, score, wet: rain && it.indoor === false };
+    }).filter((c) => c.base > -3).sort((a, b) => Number(a.wet) - Number(b.wet) || b.score - a.score);
     const ok = cands.filter((c) => { const u = lastUsed[c.it.id]; return u == null || i - u > gap; });
-    const pick = ok[0] ?? null;
-    if (pick) lastUsed[pick.it.id] = i;
-    return { date: d, pick: pick ? pick.it : null, alts: ok.slice(1, 3).map((c) => c.it) };
+    const left = budget == null ? null : budget - (spent[week] ?? 0);
+    const cost = (it: Item) => opts?.costFn?.(it, d) ?? null;
+    const fits = ok.filter((c) => { const k = cost(c.it); return left == null || k == null || k <= left; });
+    const pick = fits[0] ?? null;
+    const why: string[] = [];
+    if (pick) {
+      lastUsed[pick.it.id] = i;
+      if (weekdayOf[pick.it.id] === weekday) why.push("Samma veckodag som förra gången");
+      else if (weekdayOf[pick.it.id] == null) weekdayOf[pick.it.id] = weekday;
+      spent[week] = (spent[week] ?? 0) + (cost(pick.it) ?? 0);
+      if (rain && pick.it.indoor === true) why.push("Inomhus: regn väntas");
+      if (rain && pick.it.indoor === false) why.push("Utomhus trots regn: inget annat passade den dagen");
+      if (ok[0] && ok[0].it.id !== pick.it.id) why.push("Valt för att rymmas i veckobudgeten");
+    }
+    return { date: d, pick: pick ? pick.it : null, alts: fits.slice(1, 3).map((c) => c.it), why, overBudget: !pick && ok.length > 0 };
   });
 }
 

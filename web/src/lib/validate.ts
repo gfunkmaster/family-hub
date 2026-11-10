@@ -226,6 +226,8 @@ export function parseProfile(body: unknown): Result<Profile> {
   if (b.adults !== undefined && !(isNum(b.adults) && Number.isInteger(b.adults) && b.adults >= 1 && b.adults <= 6)) errors.push("adults måste vara 1–6");
   if (!optNum(b.budgetMax) || (isNum(b.budgetMax) && (b.budgetMax < 0 || b.budgetMax > 100000))) errors.push("budgetMax måste vara 0–100 000 kr eller tomt");
 
+  if (!optNum(b.weekBudget) || (isNum(b.weekBudget) && (b.weekBudget < 0 || b.weekBudget > 100000))) errors.push("weekBudget måste vara 0–100 000 kr eller tomt");
+
   const children: NonNullable<Profile["children"]> = [];
   if (b.children !== undefined) {
     if (!Array.isArray(b.children) || b.children.length > 8) errors.push("children måste vara en lista med högst 8 barn");
@@ -289,6 +291,7 @@ export function parseProfile(body: unknown): Result<Profile> {
     value: {
       adults: isNum(b.adults) ? b.adults : 2,
       budgetMax: isNum(b.budgetMax) ? b.budgetMax : null,
+      weekBudget: isNum(b.weekBudget) ? b.weekBudget : null,
       children, naps, places, interests, avoid,
       needs: { stroller: needs.stroller === true, changing: needs.changing === true },
       availability: { weekdays: avail.weekdays === true, weekends: avail.weekends !== false },

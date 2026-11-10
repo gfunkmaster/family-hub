@@ -170,9 +170,14 @@ function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: st
   return (
     <section className="schedule" aria-label="Schema">
       <p className="meta">
-        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan.
+        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan. När regn väntas väljs utomhus bara om inget annat passar.
         {" "}Kostnad ca {kr(schedule.total)}{schedule.unknownCost ? " plus okända priser" : ""}{rest ? `, ${rest} vilodag${rest > 1 ? "ar" : ""}` : ""}.
       </p>
+      {schedule.weeks.length > 1 || schedule.weeks.some((w) => w.budget != null) ? (
+        <ul className="meta weeks">{schedule.weeks.map((w) => (
+          <li key={w.from}>v. {w.week}: {kr(w.total)}{w.budget != null ? ` av ${kr(w.budget)}` : ""}{w.unknownCost ? ", plus okända priser" : ""}</li>
+        ))}</ul>
+      ) : null}
       {schedule.days.map((d) => {
         const p = dayParts(d.date), it = d.pick?.item;
         const time = it?.dates?.find((x) => x.date === d.date)?.from;
@@ -187,10 +192,11 @@ function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: st
               <div className="spick">
                 <h3>{it.title}</h3>
                 <p className="meta">{[time, it.venue, d.pick.travel?.min != null ? `${MODE[d.pick.travel.mode] ?? ""}${d.pick.travel.estimated ? " ca" : ""} ${d.pick.travel.min} min` : null, d.pick.cost.total != null ? kr(d.pick.cost.total) : "pris okänt"].filter(Boolean).join(", ")}</p>
+                {d.why.length ? <p className="meta">{d.why.join(". ")}.</p> : null}
                 {d.alts.length ? <p className="meta">Annars: {d.alts.map((a) => a.item.title).join(", ")}</p> : null}
                 {past ? null : <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link></div>}
               </div>
-            ) : <p className="meta">Inget förslag den här dagen. En vilodag.</p>}
+            ) : <p className="meta">{d.overBudget ? "Veckobudgeten är slut: inget av dagens förslag ryms. En vilodag, eller höj budgeten under Familj." : "Inget förslag den här dagen. En vilodag."}</p>}
           </div>
         );
       })}

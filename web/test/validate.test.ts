@@ -155,3 +155,12 @@ test("omöjliga datum avvisas", () => {
   assert.equal(parseRun({ ...run, from: "2026-11-31", to: "2026-12-01" }).ok, false);
   assert.equal(parseRun({ ...run, items: [{ ...item, dates: [{ date: "2028-02-29" }] }] }).ok, true, "skottdag");
 });
+
+test("veckobudget i profilen", () => {
+  const ok = parseProfile({ weekBudget: 800 });
+  assert.equal(ok.ok && ok.value.weekBudget, 800);
+  const empty = parseProfile({});
+  assert.equal(empty.ok && empty.value.weekBudget, null, "saknas: ingen gräns, aldrig 0");
+  assert.equal(parseProfile({ weekBudget: -1 }).ok, false);
+  assert.equal(parseProfile({ weekBudget: "800" }).ok, false);
+});

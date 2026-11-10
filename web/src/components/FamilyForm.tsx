@@ -40,6 +40,7 @@ function NapBand({ naps }: { naps: Nap[] }) {
 export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id: string; name: string }[] }) {
   const [adults, setAdults] = useState(String(profile.adults ?? 2));
   const [budget, setBudget] = useState(profile.budgetMax == null ? "" : String(profile.budgetMax));
+  const [weekBudget, setWeekBudget] = useState(profile.weekBudget == null ? "" : String(profile.weekBudget));
   const [children, setChildren] = useState<Child[]>(profile.children ?? []);
   const [naps, setNaps] = useState<Nap[]>(profile.naps ?? []);
   const [places, setPlaces] = useState<Place[]>(profile.places ?? []);
@@ -100,6 +101,7 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
   const save = () => start(async () => {
     const res = await saveProfile({
       adults: Number(adults), budgetMax: budget.trim() === "" ? null : Number(budget),
+      weekBudget: weekBudget.trim() === "" ? null : Number(weekBudget),
       children, naps, places, interests: tags(interests), avoid: tags(avoid),
       needs: { stroller, changing }, availability: { weekdays, weekends },
       leaveUntil: leaveUntil || null, homeCity: homeCity || undefined, autoRun,
@@ -159,7 +161,9 @@ export function FamilyForm({ profile, cities }: { profile: Profile; cities: { id
         <div className="grid2">
           <label>Vuxna<input type="number" min={1} max={6} value={adults} onChange={(e) => touch(setAdults)(e.target.value)} /></label>
           <label>Max per dag, hela familjen (kr)<input type="number" min={0} step={50} value={budget} placeholder="ingen gräns" onChange={(e) => touch(setBudget)(e.target.value)} /></label>
+          <label>Max per vecka i schemat (kr)<input type="number" min={0} step={100} value={weekBudget} placeholder="ingen gräns" onChange={(e) => touch(setWeekBudget)(e.target.value)} /></label>
         </div>
+        <p className="meta">Veckobudgeten styr schemat för vecka och månad: det väljer bara aktiviteter som ryms i veckan. Okända priser räknas inte med.</p>
         <label className="check"><input type="checkbox" checked={stroller} onChange={(e) => touch(setStroller)(e.target.checked)} /> Vi har barnvagn med oss</label>
         <label className="check"><input type="checkbox" checked={changing} onChange={(e) => touch(setChanging)(e.target.checked)} /> Vi behöver skötrum</label>
         <label>Mer av (kommaseparerat)<input value={interests} placeholder="natur, lek, musik" onChange={(e) => touch(setInterests)(e.target.value)} /></label>
