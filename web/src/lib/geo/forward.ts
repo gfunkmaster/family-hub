@@ -13,17 +13,19 @@ const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object
 const str = (x: unknown): string => (typeof x === "string" ? x.trim() : "");
 const norm = (t: string) => t.toLowerCase().normalize("NFC");
 
-/** Orten för en träff: tätort, annars kommunen utan "kommun" ("Växjö kommun" → "Växjö"). */
+/** Orten för en träff: tätort, annars kommunen utan ordet "kommun" ("Växjö kommun" → "Växjö", "Ystads kommun" → "Ystads"). */
 function townOf(hit: Record<string, unknown>): string {
   const a = isObj(hit.address) ? hit.address : {};
-  return str(a.city) || str(a.town) || str(a.village) || str(a.municipality).replace(/s? kommun$/i, "");
+  return str(a.city) || str(a.town) || str(a.village) || str(a.municipality).replace(/ kommun$/i, "");
 }
 
 /** Nämner frågan orten som ett eget ord? "Lundavägen 5" nämner inte Lund, "Storgatan 3, Lund" gör det. */
 export function namesTown(query: string, town: string): boolean {
   const words = (t: string) => norm(t).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-  const q = words(query), t = words(town);
-  return t.length > 0 && q.some((_, i) => t.every((w, j) => q[i + j] === w));
+  const q = words(query);
+  const has = (t: string[]) => t.length > 0 && q.some((_, i) => t.every((w, j) => q[i + j] === w));
+  // Kommunnamn står ofta i genitiv ("Ystads kommun"): prova även utan slut-s. "Borås" behåller sitt s i första försöket.
+  return has(words(town)) || (/s$/i.test(town) && has(words(town.slice(0, -1))));
 }
 
 function toHit(first: Record<string, unknown>): GeoHit | null {

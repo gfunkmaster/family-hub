@@ -59,6 +59,10 @@ test("geokodning: orten måste stå som ett eget ord i frågan, inte inuti ett g
   assert.equal(namesTown("Väsbygatan 3", "Upplands Väsby"), false);
   assert.equal(namesTown("storgatan 3,växjö", "Växjö"), true);
   assert.equal(namesTown("Storgatan 3", ""), false);
+  const kommun = (name: string, q: string) => parseSearch([{ lat: "57.7", lon: "12.9", display_name: `Storgatan, ${name}`, address: { road: "Storgatan", municipality: name } }, { lat: "63.8", lon: "20.2", display_name: "Storgatan, Umeå", address: { road: "Storgatan", city: "Umeå" } }], q);
+  assert.equal(kommun("Borås kommun", "Storgatan, Borås").hit?.lat, 57.7, "Borås behåller sitt s");
+  assert.equal(kommun("Ystads kommun", "Storgatan, Ystad").hit?.lat, 57.7, "genitiv-s i kommunnamnet");
+  assert.equal(kommun("Borås kommun", "Storgatan").ambiguous, true);
 });
 
 test("geokodning: kommun räknas som ort utan ordet kommun, och en träff utan ort gör frågan tvetydig", () => {
