@@ -156,7 +156,7 @@ test("schema: veckosummor mot veckobudget, och regn väljer inomhus", () => {
 test("dagsplan: resan mellan aktiviteterna räknas från den förra, och hem från den sista", () => {
   const p = dayPlanFor(run, { ...profile, naps: [] }, city, { name: "Hemma", lat: 59.3503, lng: 17.9965 }, "2026-11-10", ["near", "far"]);
   const trips = p.blocks.filter((b) => b.kind === "resa");
-  assert.deepEqual(trips.map((t) => t.title), ["Resa", "Resa", "Resa hem"]);
+  assert.deepEqual(trips.map((t) => t.title), ["Resa", "Resa", "Resa tillbaka"]);
   assert.match(trips[1]?.note ?? "", /från Öppna förskolan, uppskattat$/);
   const noCoords: RunView = { ...run, items: run.items.map((i) => (i.id === "far" ? { ...i, lat: undefined, lng: undefined } : i)) };
   const q = dayPlanFor(noCoords, { ...profile, naps: [] }, city, null, "2026-11-10", ["near", "far"]);

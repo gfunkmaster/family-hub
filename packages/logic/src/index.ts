@@ -382,7 +382,7 @@ export interface PlanOpts {
   dayStart?: string; dayEnd?: string; lunch?: string;
   /** Restid från föregående aktivitet till nästa. Utan den (eller vid null) används aktivitetens restid hemifrån. */
   travelBetween?: (from: PlanItem, to: PlanItem) => { min: number; note?: string } | null;
-  /** Lägg till resan hem efter dagens sista aktivitet. */
+  /** Lägg till resan tillbaka till utgångspunkten efter dagens sista aktivitet. */
   homeTrip?: boolean;
 }
 export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts?: PlanOpts): Block[] {
@@ -449,12 +449,14 @@ export function autoPlan(items: PlanItem[], profile: Profile, date: string, opts
     blocks.push({ start, end: fin, kind: "aktivitet", title: q.it.title, itemId: q.it.id, note: [q.it.venue, ...napNotes].filter(Boolean).join(". ") });
     cur = fin; prev = q.it;
   }
-  const home = prev?._travelMin ?? 0;
-  if (o.homeTrip && prev && home > 0) {
-    blocks.push({ start: cur, end: cur + home, kind: "resa", title: "Resa hem", note: prev._travelNote ?? "" });
-    cur += home;
+  // Resan tillbaka till utgångspunkten, med samma restid som dit. En tupplur som börjar under resan
+  // försvinner inte: den börjar när resan är slut.
+  const back = prev?._travelMin ?? 0, backFrom = cur;
+  if (o.homeTrip && prev && back > 0) {
+    blocks.push({ start: cur, end: cur + back, kind: "resa", title: "Resa tillbaka", note: prev._travelNote ?? "" });
+    cur += back;
   }
-  for (const n of naps) if (!n.used && n.from >= cur && n.to <= end) takeNap(n);
+  for (const n of naps) if (!n.used && n.from >= backFrom && n.to <= end) takeNap(n);
   if (!lunchDone && lunchAt >= dayStart) {
     // Upptaget vid lunchtid: lunch direkt efter det som pågår, så att dagen alltid har en måltid.
     let at = lunchAt;
@@ -529,7 +531,7 @@ export interface ScheduledDay {
 export function weekStart(iso: string): string { return addDays(iso, -((parseDate(iso).getDay() + 6) % 7)); }
 /**
  * One main activity per free day: best score that day, not the same item within `gap` days, never one that does not fit the age.
- * Regn väntas: inomhus går före utomhus. Ett återkommande pass hålls helst kvar på veckodagen det först fick.
+ * Regn väntas: det som är utomhus väljs bara om inget annat passar. Ett återkommande pass hålls helst kvar på veckodagen det först fick.
  * Med `weekBudget` väljs bara det som ryms i det som är kvar av veckan; okända priser räknas inte, de gissas aldrig.
  */
 export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item, date: string) => number, opts?: ScheduleOpts): ScheduledDay[] {
@@ -540,11 +542,11 @@ export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item
     const cands = items.filter((it) => dayEntry(it, d)).map((it) => {
       const base = scoreFn(it, d);
       let score = base;
-      if (rain && it.indoor === false) score -= 3;
       if (rain && it.indoor === true) score += 1;
       if (weekdayOf[it.id] === weekday) score += 1.5;
-      return { it, base, score };
-    }).filter((c) => c.base > -3).sort((a, b) => b.score - a.score);
+      // Regn: det som är utomhus hamnar efter allt annat, oavsett poäng. Okänt (indoor saknas) räknas inte som utomhus.
+      return { it, base, score, wet: rain && it.indoor === false };
+    }).filter((c) => c.base > -3).sort((a, b) => Number(a.wet) - Number(b.wet) || b.score - a.score);
     const ok = cands.filter((c) => { const u = lastUsed[c.it.id]; return u == null || i - u > gap; });
     const left = budget == null ? null : budget - (spent[week] ?? 0);
     const cost = (it: Item) => opts?.costFn?.(it, d) ?? null;
@@ -557,7 +559,7 @@ export function schedulePeriod(items: Item[], days: string[], scoreFn: (it: Item
       else if (weekdayOf[pick.it.id] == null) weekdayOf[pick.it.id] = weekday;
       spent[week] = (spent[week] ?? 0) + (cost(pick.it) ?? 0);
       if (rain && pick.it.indoor === true) why.push("Inomhus: regn väntas");
-      if (rain && pick.it.indoor === false) why.push("Utomhus trots regn: inget inomhus passade den dagen");
+      if (rain && pick.it.indoor === false) why.push("Utomhus trots regn: inget annat passade den dagen");
       if (ok[0] && ok[0].it.id !== pick.it.id) why.push("Valt för att rymmas i veckobudgeten");
     }
     return { date: d, pick: pick ? pick.it : null, alts: fits.slice(1, 3).map((c) => c.it), why, overBudget: !pick && ok.length > 0 };

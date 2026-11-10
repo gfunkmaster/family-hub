@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { forwardGeocode, geocode, parseSearch } from "../src/lib/geo/forward.ts";
+import { forwardGeocode, geocode, namesTown, parseSearch } from "../src/lib/geo/forward.ts";
 
 const hit = [{ lat: "56.8790044", lon: "14.8058522", display_name: "Storgatan 3, Växjö, Kronobergs län, Sverige", address: { road: "Storgatan", house_number: "3", city: "Växjö" } }];
 const respond = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -48,4 +48,22 @@ test("geokodning: cache, och fel från tjänsten ger failed utan att kasta eller
   assert.equal(calls, 2, "efter ett dygn hämtas den igen");
   assert.deepEqual(await geocode("Felgatan 1", respond("x", 503)), { hit: null, ambiguous: false, failed: true });
   assert.deepEqual(await geocode("Felgatan 1", respond([])), { hit: null, ambiguous: false, failed: false }, "felet cachades inte");
+});
+
+test("geokodning: orten måste stå som ett eget ord i frågan, inte inuti ett gatunamn", () => {
+  const at = (road: string, city: string, lat: string) => ({ lat, lon: "13.2", display_name: `${road}, ${city}, Sverige`, address: { road, city } });
+  assert.deepEqual(parseSearch([at("Lundavägen", "Lund", "55.70"), at("Lundavägen", "Malmö", "55.60"), at("Lundavägen", "Eslöv", "55.84")], "Lundavägen 5"), { hit: null, ambiguous: true });
+  assert.deepEqual(parseSearch([at("Fredsgatan", "Ed", "58.91"), at("Fredsgatan", "Umeå", "63.82")], "Fredsgatan 5"), { hit: null, ambiguous: true });
+  assert.equal(parseSearch([at("Lundavägen", "Lund", "55.70"), at("Lundavägen", "Malmö", "55.60")], "Lundavägen 5, Lund").hit?.lat, 55.7);
+  assert.equal(namesTown("Storgatan 3 Upplands Väsby", "Upplands Väsby"), true, "ort i flera ord");
+  assert.equal(namesTown("Väsbygatan 3", "Upplands Väsby"), false);
+  assert.equal(namesTown("storgatan 3,växjö", "Växjö"), true);
+  assert.equal(namesTown("Storgatan 3", ""), false);
+});
+
+test("geokodning: kommun räknas som ort utan ordet kommun, och en träff utan ort gör frågan tvetydig", () => {
+  const kommun = [{ lat: "57.1", lon: "14.9", display_name: "Storgatan, Lammhult, Växjö kommun, Sverige", address: { road: "Storgatan", municipality: "Växjö kommun" } }, { lat: "63.8", lon: "20.2", display_name: "Storgatan, Umeå", address: { road: "Storgatan", city: "Umeå" } }];
+  assert.equal(parseSearch(kommun, "Storgatan, Växjö").hit?.lat, 57.1, "frågan nämner Växjö, träffen ligger i Växjö kommun");
+  const noTown = [{ lat: "56.9", lon: "14.8", display_name: "Stationen, Växjö", address: { road: "Stationen", city: "Växjö" } }, { lat: "60.1", lon: "15.0", display_name: "Stationen", address: { road: "Stationen" } }];
+  assert.deepEqual(parseSearch(noTown, "Stationen"), { hit: null, ambiguous: true });
 });
