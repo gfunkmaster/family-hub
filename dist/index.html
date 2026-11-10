@@ -316,7 +316,8 @@ function ageFitFor(item      , children                     , date        )     
 
 // ---------- Booking ----------
 
-const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
+/** "YYYY-MM-DD", "YYYY-MM-DDTHH:MM" eller med sekunder, som modeller ofta skriver. Sekunderna används inte. */
+const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::\d{2})?)?$/;
                                 
                                                                                                                            
                                    

@@ -131,6 +131,8 @@ test("förbokning valideras", () => {
   assert.equal(withBooking({ required: "oklart", opensAt: null, url: null }).ok, true);
   assert.equal(withBooking({ opensAt: "2026-11-12" }).ok, true);
   assert.equal(withBooking({ required: "oklart", opensAt: null, url: null, note: null }).ok, true, "null överallt, som prompten ber om för okänt");
+  assert.equal(withBooking({ required: "oklart", opensAt: "", url: "", note: "" }).ok, true, "tom text är okänt, inte ett fel");
+  assert.equal(withBooking({ required: "ja", opensAt: "2026-11-12T09:00:00" }).ok, true, "sekunder godtas");
   assert.equal(withBooking({ required: "ja", note: "x".repeat(900) }).ok, true, "en lång anteckning fäller inte körningen");
   for (const [bad, part] of [
     [{ required: "kanske" }, "booking.required"],
