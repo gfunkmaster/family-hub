@@ -2,6 +2,7 @@
 
 ## Ej släppt
 
+- Geokodning på servern (`web/src/lib/geo/forward.ts`, `/api/geocode`): en beställning med "Adress eller ort" får koordinater direkt via OpenStreetMaps Nominatim (bara Sverige, ett dygns cache), så att sökningen får en exakt mittpunkt och restiderna inte hänger på modellens koordinater. På Familj-sidan slår "Slå upp adressen" upp en sparad plats. Ingen träff ger inga koordinater: då tar sökningen reda på platsen själv, som förut.
 - Förbokning på förslagen (`Item.booking`): om bokning krävs, när den öppnar och en länk till bokningssidan. Förslag-sidan visar "Förbokning krävs" eller "Drop-in", när bokningen öppnar, och en länk som lägger en påminnelse i Google Kalender den dagen. Okänt visas inte alls. Valideras i `parseRun`, och både direktsökningen och torsdagskörningens instruktioner frågar efter fältet.
 - Dagsplanen flyttar inte längre ett evenemang med fast tid för en tupplur (`autoPlan`). Tuppluren kortas till avresan med rådet att låta barnet sova vidare i vagnen, och en tupplur under evenemanget kortar inte evenemanget. Platser utan fast tid planeras som förut. Exempel: Babykyrka 10.15 planerades tidigare 10.42.
 - Förslag: valet "Restid från" heter "Sökningens utgångspunkt" när ingen sparad plats finns, så att det stämmer med texten under. "Sökningens egna restider" visas bara när det skiljer sig från standardvalet.

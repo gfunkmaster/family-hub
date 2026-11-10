@@ -12,6 +12,7 @@ import { env } from "@/lib/env";
 import { createLimiter } from "@/lib/ratelimit";
 import { isValidId, parseCity, parseProfile } from "@/lib/validate";
 import { runDirectSearch } from "@/lib/agent/runner";
+import { geocode } from "@/lib/geo/forward";
 import { runKey } from "@/lib/suggest";
 
 async function requireFamily(): Promise<void> {
@@ -64,7 +65,7 @@ export async function rate(input: { key: string; runId: string; itemId: string; 
   revalidatePath("/");
 }
 
-export type RequestState = { error?: string; ok?: boolean; direct?: boolean } | null;
+export type RequestState = { error?: string; ok?: boolean; direct?: boolean; located?: string | null } | null;
 
 /** Sparar en beställning. "Sök nu" startar direktsökningen efter svaret, så sidan inte väntar på den. */
 export async function createRequest(_prev: RequestState, form: FormData): Promise<RequestState> {
@@ -95,8 +96,12 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
     origin = { name: place.name, lat, lng };
   } else if (where === "plats") {
     if (!placeName) return { error: "Skriv en adress eller ort." };
-    place = { name: placeName, address: placeName };
-    origin = { name: placeName, address: placeName };
+    // Koordinater från servern, så att restid kan räknas direkt och sökningen får en exakt mittpunkt.
+    // Ingen träff eller inget svar: beställningen går vidare utan koordinater, som förut.
+    const { hit } = await geocode(placeName);
+    const coords = hit ? { lat: hit.lat, lng: hit.lng } : {};
+    place = { name: placeName, address: hit?.label || placeName, ...coords };
+    origin = { name: placeName, address: hit?.label || placeName, ...coords };
   } else {
     if (!isValidId(city)) return { error: "Välj stad." };
     cityId = city;
@@ -107,7 +112,7 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   });
   if (mode === "direkt") after(() => runDirectSearch(req.id));
   revalidatePath("/bestall");
-  return { ok: true, direct: mode === "direkt" };
+  return { ok: true, direct: mode === "direkt", ...(where === "plats" ? { located: place?.lat != null ? (place.address ?? null) : null } : {}) };
 }
 
 /** Sparar familjens profil från Familj-sidan. Samma kontroll som importen. */

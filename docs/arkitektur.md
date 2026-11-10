@@ -40,6 +40,7 @@ Den schemalagda körningen räknar restid från familjens utgångspunkt (bestäl
 `web/` är en Next.js-sida (App Router) i strikt TypeScript som ska ersätta artifacten. Den har inte artifactens begränsningar:
 
 - **Position:** sidan ber om telefonens GPS när du väljer "Där jag är nu", och restid och kostnad räknas om direkt. Adressen slås upp via `/api/reverse` (OpenStreetMaps Nominatim, från servern, inloggning krävs, en timmes cache) och visas under knappen. Koordinaterna skickas alltså till OpenStreetMap, och bara när du trycker.
+- **Adress till koordinater:** en beställning med "Adress eller ort" och knappen "Slå upp adressen" på Familj-sidan slår upp koordinater via `/api/geocode` (Nominatim, från servern, bara Sverige, inloggning krävs, ett dygns cache). Adressen skickas alltså till OpenStreetMap. Hittas den inte sparas inga koordinater, och direktsökningen får då själv ange områdets mittpunkt.
 - **Data:** Postgres via Prisma 7. Tabellerna speglar artifactens databas, så flytten är en import.
 - **Agenten:** den schemalagda körningen fortsätter att vara agenten och kör på Claude-prenumerationen. Den läser och skriver via `/api/agent/*` med en Bearer-token, istället för artifactens databasverktyg. Allt den skickar valideras innan det sparas.
 - **Inloggning:** ett familjelösenord ger en signerad kaka (HMAC) som gäller i 90 dagar. Bara sidorna kräver den. Agentens API har sin egen token.
