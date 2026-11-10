@@ -44,6 +44,7 @@ I ordning: requestens origin; annars places-posten som cities/<id>.defaultPlaceI
 5. VERIFIERA OCH BEDÖM
 - För varje evenemang: hämta arrangörens egen sida. verified: true bara om den bekräftar datum och tid. Säger källor olika saker: skriv det i conflict och sätt verified: false.
 - Priser: skriv bara priser du har hittat. Okänt pris = null. Gissa aldrig. childFreeUnder i år när barn under en viss ålder går gratis. Olika pris olika dagar: adult per datum i dates.
+- booking: required "ja" eller "nej" bara om arrangörens sida säger det, annars "oklart". opensAt bara om sidan anger när bokningen öppnar. url är bokningssidan.
 - ageFit: level "säkert" (uttryckligen för åldern), "troligt" (passar men är inte riktat), "oklart"; minMonths och maxMonths om arrangören anger ålder; note med en mening om varför.
 - Position: lat och lng för varje förslag. Obligatoriskt; appen räknar restid från familjens valda plats med dem.
 - Restid från utgångspunkten i steg 3: walk {min}, transit {min, note}, car {km, min}. Skriv "ca" i note när det är uppskattat.
@@ -51,7 +52,7 @@ I ordning: requestens origin; annars places-posten som cities/<id>.defaultPlaceI
 
 6. SKRIV
 - runs/<cityId>-<from> (set). Finns dokumentet: läs versionen först. Håll dokumentet under 200 kB (korta noter vid månadskörningar). Format:
-{city, from, to, kind, dates:[alla datum från from till to], origin:{name, lat, lng} eller null, createdAt: ISO-tid nu, summary: 1–3 meningar, weather:[{date, high, low, precip?, precipMm?}], items:[{id (kort slug), title, kind "event"|"place", venue, lat, lng, indoor true|false, durationMin, dates:[{date, from "HH:MM", to "HH:MM", adult?}], prices:{adult, child, childFreeUnder}, travel:{walk?, transit?, car?}, ageFit:{level, minMonths, maxMonths, note}, practical:{stroller "ja"|"nej"|"oklart", changing "ja"|"nej"|"oklart"}, note, conflict?, tags:[…], verified, sources:[{title, url}]}]}
+{city, from, to, kind, dates:[alla datum från from till to], origin:{name, lat, lng} eller null, createdAt: ISO-tid nu, summary: 1–3 meningar, weather:[{date, high, low, precip?, precipMm?}], items:[{id (kort slug), title, kind "event"|"place", venue, lat, lng, indoor true|false, durationMin, dates:[{date, from "HH:MM", to "HH:MM", adult?}], prices:{adult, child, childFreeUnder}, travel:{walk?, transit?, car?}, ageFit:{level, minMonths, maxMonths, note}, practical:{stroller "ja"|"nej"|"oklart", changing "ja"|"nej"|"oklart"}, booking?:{required "ja"|"nej"|"oklart", opensAt "YYYY-MM-DD"|"YYYY-MM-DDTHH:MM"|null, url|null, note}, note, conflict?, tags:[…], verified, sources:[{title, url}]}]}
 - Sätt varje behandlad request till status "klar" och runId.
 - Hittade du en pålitlig kalender som saknas i källregistret: lägg till högst 3 nya i cities/<id>.sources ({name, url, kind}).
 - Ändra aldrig app/profile eller ratings.

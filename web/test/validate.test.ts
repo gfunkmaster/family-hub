@@ -124,3 +124,23 @@ test("stad: okända fält tas bort och orimliga värden avvisas", () => {
   assert.equal(parseCity("x", { name: "X", sources: [{ name: "", url: "https://x.se" }] }).ok, false);
   assert.equal(parseCity("x", { name: "X", defaultPlaceId: "../x" }).ok, false);
 });
+
+test("förbokning valideras", () => {
+  const withBooking = (booking: unknown) => parseRun({ ...run, items: [{ ...item, booking }] });
+  assert.equal(withBooking({ required: "ja", opensAt: "2026-11-12T09:00", url: "https://boka.example/x", note: "20 platser" }).ok, true);
+  assert.equal(withBooking({ required: "oklart", opensAt: null, url: null }).ok, true);
+  assert.equal(withBooking({ opensAt: "2026-11-12" }).ok, true);
+  for (const [bad, part] of [
+    [{ required: "kanske" }, "booking.required"],
+    [{ opensAt: "12 nov" }, "booking.opensAt"],
+    [{ opensAt: "2026-13-40" }, "booking.opensAt"],
+    [{ opensAt: "2026-11-12T25:00" }, "booking.opensAt"],
+    [{ url: "javascript:alert(1)" }, "booking.url"],
+    [{ note: 5 }, "booking.note"],
+    ["ja", "booking är inget objekt"],
+  ] as const) {
+    const r = withBooking(bad);
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    if (!r.ok) assert.ok(r.errors.join("\n").includes(part), `${part}: ${r.errors.join("; ")}`);
+  }
+});

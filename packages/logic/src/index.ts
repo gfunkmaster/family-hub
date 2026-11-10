@@ -49,6 +49,8 @@ export interface Leg { min?: number | null; km?: number | null; note?: string; p
 export type Travel = Partial<Record<Mode, Leg>>;
 
 export interface DayEntry { date: string; from?: string; to?: string; adult?: number | null }
+/** Förbokning: om den krävs, när bokningen öppnar ("YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM", svensk tid) och var man bokar. */
+export interface Booking { required?: YesNo; opensAt?: string | null; url?: string | null; note?: string }
 
 export interface Item {
   id: string;
@@ -64,6 +66,7 @@ export interface Item {
   travel?: Travel;
   ageFit?: { level?: Level; minMonths?: number | null; maxMonths?: number | null; note?: string };
   practical?: { stroller?: YesNo; changing?: YesNo };
+  booking?: Booking;
   note?: string;
   conflict?: string | null;
   tags?: string[];
@@ -180,6 +183,26 @@ export function ageFitFor(item: Item, children: Child[] | undefined, date: strin
     worst = Math.min(worst, lvl);
   }
   return { level: LEVELS[worst] ?? "oklart", note: a.note ?? "" };
+}
+
+// ---------- Booking ----------
+
+export const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
+export interface BookingStatus {
+  /** "krävs": boka nu. "öppnar": krävs, men bokningen har inte öppnat. "kanske": oklart om det krävs. "ej": drop-in. */
+  state: "krävs" | "öppnar" | "kanske" | "ej";
+  opensDate: string | null; opensTime: string | null; url: string | null; note: string;
+}
+/** Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte. */
+export function bookingStatus(item: Pick<Item, "booking">, today: string): BookingStatus | null {
+  const b = item.booking;
+  if (!b || (b.required == null && !b.opensAt && !b.url && !b.note)) return null;
+  const m = BOOKING_OPENS.exec(b.opensAt ?? "");
+  const opensDate = m?.[1] ?? null, opensTime = m?.[2] ?? null;
+  const base = { opensDate, opensTime, url: safeUrl(b.url), note: b.note ?? "" };
+  if (b.required === "nej") return { ...base, state: "ej" };
+  if (b.required !== "ja") return { ...base, state: "kanske" };
+  return { ...base, state: opensDate != null && opensDate > today ? "öppnar" : "krävs" };
 }
 
 // ---------- Cost ----------

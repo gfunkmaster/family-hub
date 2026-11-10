@@ -39,7 +39,9 @@ En körning för en period.
 
 `Item`: `id, title, kind ("event"|"place"), venue, lat, lng, indoor, durationMin,
 dates [{date, from, to, adult?}], prices {adult, child, childFreeUnder}, travel {walk?, transit?, car?},
-ageFit {level, minMonths, maxMonths, note}, practical {stroller, changing}, note, conflict?, tags, verified, sources [{title, url}]`.
+ageFit {level, minMonths, maxMonths, note}, practical {stroller, changing}, booking? {required, opensAt, url, note}, note, conflict?, tags, verified, sources [{title, url}]`.
+
+`booking` är förbokning: `required` (`"ja"|"nej"|"oklart"`, bara "ja" eller "nej" när arrangören säger det), `opensAt` (`YYYY-MM-DD` eller `YYYY-MM-DDTHH:MM` i svensk tid, eller `null`), `url` (bokningssidan) och `note`. Saknas fältet är inget känt, och hemsidan visar då inget om bokning.
 
 `precip` är risken för nederbörd i procent, `precipMm` mängden i mm. Appen visar det som finns.
 

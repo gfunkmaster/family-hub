@@ -283,3 +283,17 @@ test("dagsplanen: fasta evenemang, tupplurar och lunch krockar aldrig", () => {
   const p4 = L.autoPlan([place, ev("E", "12:00", "13:00", { durationMin: 60 })], { naps: [{ from: "12:10", to: "13:00" }] }, "2026-11-13");
   check(p4, "nap+lunch"); assert.deepEqual(at(p4, "E"), ["12:00", "13:00"]);
 });
+
+test("förbokning: krävs, öppnar senare, oklart och drop-in", () => {
+  const today = "2026-11-10";
+  assert.equal(L.bookingStatus({}, today), null, "inget känt ger inget besked");
+  assert.equal(L.bookingStatus({ booking: {} }, today), null);
+  assert.equal(L.bookingStatus({ booking: { required: "ja" } }, today).state, "krävs");
+  const later = L.bookingStatus({ booking: { required: "ja", opensAt: "2026-11-12T09:00", url: "https://boka.example/x" } }, today);
+  assert.deepEqual([later.state, later.opensDate, later.opensTime, later.url], ["öppnar", "2026-11-12", "09:00", "https://boka.example/x"]);
+  assert.equal(L.bookingStatus({ booking: { required: "ja", opensAt: "2026-11-10" } }, today).state, "krävs", "öppnar idag = boka nu");
+  assert.equal(L.bookingStatus({ booking: { required: "oklart" } }, today).state, "kanske");
+  assert.equal(L.bookingStatus({ booking: { url: "https://boka.example/x" } }, today).state, "kanske", "länk utan besked är inget krav");
+  assert.equal(L.bookingStatus({ booking: { required: "nej" } }, today).state, "ej");
+  assert.equal(L.bookingStatus({ booking: { required: "ja", url: "javascript:alert(1)" } }, today).url, null);
+});

@@ -178,6 +178,8 @@ details summary{cursor:pointer;font-weight:600}
                                                 
 
                                                                                              
+/** Förbokning: om den krävs, när bokningen öppnar ("YYYY-MM-DD" eller "YYYY-MM-DDTHH:MM", svensk tid) och var man bokar. */
+                                                                                                          
 
                        
              
@@ -193,6 +195,7 @@ details summary{cursor:pointer;font-weight:600}
                   
                                                                                                   
                                                      
+                    
                 
                            
                   
@@ -309,6 +312,26 @@ function ageFitFor(item      , children                     , date        )     
     worst = Math.min(worst, lvl);
   }
   return { level: LEVELS[worst] ?? "oklart", note: a.note ?? "" };
+}
+
+// ---------- Booking ----------
+
+const BOOKING_OPENS = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
+                                
+                                                                                                                        
+                                              
+                                                                                       
+ 
+/** Vad som gäller för förbokning på ett förslag, sett från `today` (YYYY-MM-DD). Null när inget är känt: vi gissar inte. */
+function bookingStatus(item                       , today        )                       {
+  const b = item.booking;
+  if (!b || (b.required == null && !b.opensAt && !b.url && !b.note)) return null;
+  const m = BOOKING_OPENS.exec(b.opensAt ?? "");
+  const opensDate = m?.[1] ?? null, opensTime = m?.[2] ?? null;
+  const base = { opensDate, opensTime, url: safeUrl(b.url), note: b.note ?? "" };
+  if (b.required === "nej") return { ...base, state: "ej" };
+  if (b.required !== "ja") return { ...base, state: "kanske" };
+  return { ...base, state: opensDate != null && opensDate > today ? "öppnar" : "krävs" };
 }
 
 // ---------- Cost ----------

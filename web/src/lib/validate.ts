@@ -2,7 +2,7 @@
  * Validering av det den schemalagda körningen skickar in. Ren logik utan beroenden,
  * så att en felaktig körning aldrig kan skriva skräp i databasen.
  */
-import { LEVELS, safeUrl, type City, type FoodSpot, type Item, type PackedFood, type Profile } from "@family-hub/logic";
+import { BOOKING_OPENS, LEVELS, safeUrl, type City, type FoodSpot, type Item, type PackedFood, type Profile } from "@family-hub/logic";
 
 export type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
@@ -22,6 +22,8 @@ const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFin
 const optNum = (v: unknown) => v === undefined || v === null || isNum(v);
 const isIsoDate = (v: unknown): v is string => isStr(v) && ISO_DATE.test(v) && !Number.isNaN(Date.parse(v));
 const oneOf = <T extends string>(list: readonly T[], v: unknown): v is T => isStr(v) && (list as readonly string[]).includes(v);
+
+const validTime = (v: unknown): v is string => isStr(v) && HHMM.test(v) && Number(v.split(":")[0]) < 24 && Number(v.split(":")[1]) < 60;
 
 export function isValidId(id: string): boolean { return ID.test(id); }
 
@@ -55,6 +57,16 @@ function checkItem(it: unknown, i: number, errors: string[]): void {
   if (isObj(it.practical)) for (const k of ["stroller", "changing"]) {
     const v = it.practical[k];
     if (v !== undefined && !oneOf(YES_NO, v)) errors.push(`${at}.practical.${k} måste vara ja, nej eller oklart`);
+  }
+  if (it.booking !== undefined && it.booking !== null) {
+    const b = it.booking;
+    if (!isObj(b)) errors.push(`${at}.booking är inget objekt`);
+    else {
+      if (b.required !== undefined && b.required !== null && !oneOf(YES_NO, b.required)) errors.push(`${at}.booking.required måste vara ja, nej eller oklart`);
+      if (b.opensAt !== undefined && b.opensAt !== null && !(isStr(b.opensAt) && BOOKING_OPENS.test(b.opensAt) && isIsoDate(b.opensAt.slice(0, 10)) && (b.opensAt.length === 10 || validTime(b.opensAt.slice(11))))) errors.push(`${at}.booking.opensAt måste vara YYYY-MM-DD eller YYYY-MM-DDTHH:MM`);
+      if (b.url !== undefined && b.url !== null && !safeUrl(b.url)) errors.push(`${at}.booking.url måste vara en http(s)-adress`);
+      if (b.note !== undefined && !(isStr(b.note) && b.note.length <= 300)) errors.push(`${at}.booking.note måste vara text, högst 300 tecken`);
+    }
   }
   if (it.sources !== undefined) {
     if (!Array.isArray(it.sources)) errors.push(`${at}.sources måste vara en lista`);
@@ -181,7 +193,6 @@ export function parseRequestPatch(body: unknown): Result<{ status: RequestStatus
 }
 
 const AUTO_RUN = ["helg", "vecka", "ingen"] as const;
-const validTime = (v: unknown): v is string => isStr(v) && HHMM.test(v) && Number(v.split(":")[0]) < 24 && Number(v.split(":")[1]) < 60;
 const minutesOf = (t: string) => Number(t.split(":")[0]) * 60 + Number(t.split(":")[1]);
 const optBool = (v: unknown) => v === undefined || typeof v === "boolean";
 
