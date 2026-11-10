@@ -72,6 +72,7 @@ Hemsidans tabeller har några fält till, som artifacten saknar:
   - `packed [PackedFood]`: matlådor att ta med. `{id, title, fromMonths, toMonths?, ingredients [text], steps [text], keeps?, note?, sources}`. Minst en källa ska ligga på livsmedelsverket.se.
 - **Request:** `cityId` eller `place`, `radiusKm`, `mode` (`"direkt"` sidan söker själv, `"kö"` torsdagskörningen), `status` (`"ny"|"pågår"|"klar"|"fel"`) och `error` (varför den inte gick).
 - **Run.fetched:** `[{url, ok, error?}]`. Sidor som direktsökningen hämtade, ur Claude API:ets verktygssvar (inte modellens egen redovisning). Tom för körningar utan logg, som torsdagskörningen. Förslag-sidan jämför loggen med stadens källregister och visar vilka källor som hämtades, misslyckades, inte försöktes eller inte gav förslag (`web/src/lib/sourceReport.ts`).
+- **SavedSchedule:** familjens sparade schema, ett per körning: `runId`, `days [{date, itemIds}]`, `updatedAt`. Upp till fyra förslag per dag, och en tom lista är en vald vilodag. Går genom `parseSchedule`: varje dag måste finnas i körningen och varje förslag finnas den dagen. Tas bort tillsammans med körningen. Dagar som inte finns i det sparade schemat visar det automatiska valet.
 - **AgentUsage:** en rad per direktsökning: `requestId, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, webSearches, webFetches, costUsd, createdAt`. Månadens summa styr budgettaket.
 
 ## I webbläsaren

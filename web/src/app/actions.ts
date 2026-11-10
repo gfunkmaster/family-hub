@@ -10,7 +10,8 @@ import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, veri
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { createLimiter } from "@/lib/ratelimit";
-import { isValidId, parseCity, parseProfile } from "@/lib/validate";
+import { isValidId, parseCity, parseProfile, parseSchedule } from "@/lib/validate";
+import type { Item } from "@family-hub/logic";
 import { runDirectSearch } from "@/lib/agent/runner";
 import { geocode } from "@/lib/geo/forward";
 import { runKey } from "@/lib/suggest";
@@ -148,4 +149,26 @@ export async function saveProfile(input: unknown): Promise<{ ok: true } | { ok: 
   await db().profile.upsert({ where: { id: 1 }, create: { id: 1, data }, update: { data } });
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Sparar familjens schema för en körning (ett per körning). Kontrolleras mot körningens dagar och förslag. */
+export async function saveSchedule(runId: string, days: unknown): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  await requireFamily();
+  if (!isValidId(runId)) return { ok: false, errors: ["Ogiltig sökning."] };
+  const run = await db().run.findUnique({ where: { id: runId }, select: { dates: true, items: true } });
+  if (!run) return { ok: false, errors: ["Sökningen finns inte längre."] };
+  const parsed = parseSchedule(days, { dates: run.dates, items: run.items as unknown as Item[] });
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  const data = parsed.value as unknown as Prisma.InputJsonValue;
+  await db().savedSchedule.upsert({ where: { runId }, create: { runId, days: data }, update: { days: data } });
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Tar bort det sparade schemat, så att det automatiska förslaget visas igen. */
+export async function clearSchedule(runId: string): Promise<void> {
+  await requireFamily();
+  if (!isValidId(runId)) throw new Error("Ogiltig sökning");
+  await db().savedSchedule.deleteMany({ where: { runId } });
+  revalidatePath("/");
 }

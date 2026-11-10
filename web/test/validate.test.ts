@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidId, parseCity, parseProfile, parseRating, parseRequest, parseRequestPatch, parseRun } from "../src/lib/validate.ts";
+import { isValidId, parseCity, parseProfile, parseRating, parseRequest, parseRequestPatch, parseRun, parseSchedule } from "../src/lib/validate.ts";
 
 const item = {
   id: "of-huvudsta", title: "Öppna förskolan", kind: "place", lat: 59.34, lng: 17.99,
@@ -163,4 +163,29 @@ test("veckobudget i profilen", () => {
   assert.equal(empty.ok && empty.value.weekBudget, null, "saknas: ingen gräns, aldrig 0");
   assert.equal(parseProfile({ weekBudget: -1 }).ok, false);
   assert.equal(parseProfile({ weekBudget: "800" }).ok, false);
+});
+
+test("sparat schema kontrolleras mot körningens dagar och förslag", () => {
+  const r = { dates: ["2026-11-09", "2026-11-10", "2026-11-11"], items: [{ id: "a", dates: [{ date: "2026-11-09" }, { date: "2026-11-10" }] }, { id: "b", dates: [{ date: "2026-11-10" }] }, { id: "park" }] };
+  const ok = parseSchedule([{ date: "2026-11-10", itemIds: ["a", "b", "park"] }, { date: "2026-11-09", itemIds: [] }], r);
+  assert.deepEqual(ok, { ok: true, value: [{ date: "2026-11-09", itemIds: [] }, { date: "2026-11-10", itemIds: ["a", "b", "park"] }] }, "sorteras på datum, tom dag är en vilodag, förslag utan datum går alla dagar");
+  const extra = parseSchedule([{ date: "2026-11-09", itemIds: ["a"], evil: "<script>" }], r);
+  assert.deepEqual(extra.ok && extra.value, [{ date: "2026-11-09", itemIds: ["a"] }], "okända fält sparas inte");
+  for (const [bad, part] of [
+    ["nej", "lista med dagar"],
+    [[{ date: "2026-11-12", itemIds: [] }], "finns inte i sökningens period"],
+    [[{ date: "2026-02-30", itemIds: [] }], "YYYY-MM-DD"],
+    [[{ date: "2026-11-09", itemIds: ["a"] }, { date: "2026-11-09", itemIds: [] }], "två gånger"],
+    [[{ date: "2026-11-09", itemIds: ["saknas"] }], "finns inte i sökningen"],
+    [[{ date: "2026-11-09", itemIds: ["b"] }], "finns inte den 2026-11-09"],
+    [[{ date: "2026-11-10", itemIds: ["a", "a"] }], "samma förslag två gånger"],
+    [[{ date: "2026-11-10", itemIds: ["a", "b", "park", "x", "y"] }], "högst 4"],
+    [[{ date: "2026-11-10", itemIds: [1] }], "lista med id"],
+    [[{ date: "2026-11-10" }], "lista med id"],
+  ] as const) {
+    const res = parseSchedule(bad, r);
+    assert.equal(res.ok, false, JSON.stringify(bad));
+    if (!res.ok) assert.ok(res.errors.join("\n").includes(part), `${part}: ${res.errors.join("; ")}`);
+  }
+  assert.equal(parseSchedule(Array.from({ length: 63 }, () => ({ date: "2026-11-09", itemIds: [] })), r).ok, false);
 });

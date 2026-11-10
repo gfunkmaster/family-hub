@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dayPlanFor, rankedSuggestions, runKey, scheduleFor, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
+import { dayPlanFor, rankedSuggestions, runKey, scheduleFor, scheduleToSaved, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
 
 const profile = { adults: 2, children: [{ birthdate: "2026-01-27" }], availability: { weekdays: true, weekends: false } };
 const city = { id: "stockholm", name: "Stockholm", transport: { car: true, transit: true }, maxTravelMin: 45, carCostPerKm: 2.5, transitTicket: { adult: 43 }, childFreeTransitUnder: 12 };
@@ -161,4 +161,27 @@ test("dagsplan: resan mellan aktiviteterna räknas från den förra, och hem fr�
   const noCoords: RunView = { ...run, items: run.items.map((i) => (i.id === "far" ? { ...i, lat: undefined, lng: undefined } : i)) };
   const q = dayPlanFor(noCoords, { ...profile, naps: [] }, city, null, "2026-11-10", ["near", "far"]);
   assert.doesNotMatch(q.blocks.filter((b) => b.kind === "resa")[1]?.note ?? "", /från Öppna förskolan/, "utan koordinater gäller sökningens restid hemifrån");
+});
+
+test("eget schema: familjens val gäller för sina dagar, resten är automatiskt, och summan följer det som visas", () => {
+  const auto = scheduleFor(run, profile, city, null, []);
+  assert.ok(auto.days.every((d) => !d.own && d.chosen.length === (d.pick ? 1 : 0)), "utan eget schema är det valda det automatiska");
+  assert.deepEqual(scheduleToSaved(auto).map((d) => d.itemIds), auto.days.map((d) => (d.pick ? [d.pick.item.id] : [])));
+  const own = [{ date: "2026-11-10", itemIds: ["near", "far"] }, { date: "2026-11-11", itemIds: [] }, { date: "2026-11-12", itemIds: ["far", "borta"] }, { date: "2026-11-09", itemIds: ["far"] }];
+  const sch = scheduleFor(run, profile, city, null, [], 2, own);
+  const day = (date: string) => sch.days.find((d) => d.date === date);
+  assert.deepEqual(day("2026-11-10")?.chosen.map((c) => c.item.id), ["near", "far"], "två förslag samma dag");
+  assert.deepEqual(day("2026-11-11")?.chosen, [], "en vald vilodag förblir tom");
+  assert.equal(day("2026-11-11")?.own, true);
+  assert.deepEqual(day("2026-11-12")?.chosen.map((c) => c.item.id), ["far"], "ett förslag som inte längre finns i körningen faller bort");
+  assert.deepEqual(day("2026-11-09")?.chosen, [], "Blubb är stängt på måndagen och visas inte där");
+  assert.equal(day("2026-11-13")?.own, false, "en dag utanför det egna schemat är automatisk");
+  assert.deepEqual(day("2026-11-13")?.chosen.map((c) => c.item.id), day("2026-11-13")?.pick ? [day("2026-11-13")?.pick?.item.id] : []);
+  assert.ok(!day("2026-11-10")?.options.some((o) => ["near", "far"].includes(o.item.id)), "valda förslag erbjuds inte igen");
+  assert.ok(!day("2026-11-11")?.options.some((o) => o.item.id === "big-kids"), "det som inte passar åldern erbjuds inte");
+  const sum = sch.days.flatMap((d) => d.chosen).reduce((n, c) => n + (c.cost.total ?? 0), 0);
+  assert.equal(sch.total, sum);
+  assert.equal(sch.weeks[0]?.total, sum);
+  const round = scheduleFor(run, profile, city, null, [], 2, scheduleToSaved(sch));
+  assert.deepEqual(scheduleToSaved(round), scheduleToSaved(sch), "det som sparas ger samma schema tillbaka");
 });

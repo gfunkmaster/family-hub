@@ -24,7 +24,12 @@ export interface RunView {
   /** Sidor som direktsökningen hämtade. Tom för körningar utan logg (torsdagskörningen). */
   fetched: { url: string; ok: boolean; error?: string }[];
   origin: Origin | null;
+  /** Familjens sparade schema för körningen, om det finns. */
+  schedule?: SavedDay[] | null;
 }
+
+/** En dag i ett sparat schema. En tom lista är en vald vilodag. */
+export interface SavedDay { date: string; itemIds: string[] }
 
 /** Stadens inställningar, eller rimliga standardvärden för en sökning runt en plats. */
 export function cityFor<T extends City & { id: string; name: string }>(run: Pick<RunView, "city" | "cityId" | "label" | "place">, cities: T[]): City & { id: string; name: string } {
@@ -95,7 +100,18 @@ export function suggestionsByDay(run: RunView, profile: Profile, city: City, ori
   });
 }
 
-export interface ScheduleDay { date: string; weather: Weather | null; pick: Suggestion | null; alts: Suggestion[]; why: string[]; overBudget: boolean }
+export interface ScheduleDay {
+  date: string; weather: Weather | null;
+  /** Det automatiska valet för dagen, och två alternativ. */
+  pick: Suggestion | null; alts: Suggestion[];
+  /** Det som gäller för dagen: familjens egna val om dagen finns i det sparade schemat, annars det automatiska valet. */
+  chosen: Suggestion[];
+  /** Fler förslag som finns den dagen och inte är valda, bästa först. */
+  options: Suggestion[];
+  /** Dagen kommer från familjens eget schema (sparat eller under redigering). */
+  own: boolean;
+  why: string[]; overBudget: boolean;
+}
 /** Summan för en vecka (måndag–söndag) i schemat. `budget` är profilens veckobudget, eller null utan gräns. */
 export interface ScheduleWeek { from: string; week: number; total: number; unknownCost: boolean; budget: number | null }
 export interface Schedule { days: ScheduleDay[]; weeks: ScheduleWeek[]; freeDays: number; total: number; unknownCost: boolean }
@@ -105,8 +121,11 @@ export interface Schedule { days: ScheduleDay[]; weeks: ScheduleWeek[]; freeDays
  * eller med bara en dag emellan (`gap`), och inget som inte passar åldern. Dagar utan förslag är vilodagar.
  * Regn väntas: inomhus går före. Återkommande pass hålls på samma veckodag. Med veckobudget i profilen väljs
  * bara det som ryms i veckan; okända priser räknas inte mot budgeten, de markeras.
+ *
+ * `own` är familjens eget schema. Dagar som finns där visar familjens val (förslag som inte längre finns i
+ * körningen den dagen faller bort); övriga dagar visar det automatiska valet. Summorna gäller det som visas.
  */
-export function scheduleFor(run: RunView, profile: Profile, city: City, origin: Origin | null, ratingList: StoredRating[], gap = 2): Schedule {
+export function scheduleFor(run: RunView, profile: Profile, city: City, origin: Origin | null, ratingList: StoredRating[], gap = 2, own: SavedDay[] | null = null): Schedule {
   const ratings = Object.fromEntries(ratingList.map((r) => [r.key, r]));
   const tw = tagWeightsFrom(ratingList);
   const cache = new Map<string, Suggestion>();
@@ -119,16 +138,30 @@ export function scheduleFor(run: RunView, profile: Profile, city: City, origin: 
   const free = activeDays(run.dates, profile);
   const budget = profile.weekBudget ?? null;
   const plan = schedulePeriod(run.items, free, (it, d) => sug(it, d).score, { gap, weather: run.weather, weekBudget: budget, costFn: (it, d) => sug(it, d).cost.total });
-  const days = plan.map((x) => ({ date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick: x.pick ? sug(x.pick, x.date) : null, alts: x.alts.map((a) => sug(a, x.date)), why: x.why, overBudget: x.overBudget }));
+  const onDay = (it: Item, d: string) => !it.dates?.length || !!dayEntry(it, d);
+  const days: ScheduleDay[] = plan.map((x) => {
+    const mine = own?.find((o) => o.date === x.date);
+    const pick = x.pick ? sug(x.pick, x.date) : null;
+    const chosen = mine
+      ? mine.itemIds.flatMap((id) => { const it = run.items.find((i) => i.id === id); return it && onDay(it, x.date) ? [sug(it, x.date)] : []; })
+      : pick ? [pick] : [];
+    const options = run.items.filter((it) => dayEntry(it, x.date) && !chosen.some((c) => c.item.id === it.id)).map((it) => sug(it, x.date)).filter((s) => s.score > -3).sort((a, b) => b.score - a.score).slice(0, 6);
+    return { date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick, alts: x.alts.map((a) => sug(a, x.date)), chosen, options, own: !!mine, why: mine ? [] : x.why, overBudget: !mine && x.overBudget };
+  });
   const weeks: ScheduleWeek[] = [];
   for (const d of days) {
     const from = weekStart(d.date);
     let w = weeks.find((x) => x.from === from);
     if (!w) { w = { from, week: isoWeek(d.date), total: 0, unknownCost: false, budget }; weeks.push(w); }
-    if (d.pick) { w.total += d.pick.cost.total ?? 0; if (d.pick.cost.total == null) w.unknownCost = true; }
+    for (const c of d.chosen) { w.total += c.cost.total ?? 0; if (c.cost.total == null) w.unknownCost = true; }
   }
-  const picks = days.flatMap((d) => (d.pick ? [d.pick] : []));
-  return { days, weeks, freeDays: free.length, total: picks.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: picks.some((p) => p.cost.total == null) };
+  const all = days.flatMap((d) => d.chosen);
+  return { days, weeks, freeDays: free.length, total: all.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: all.some((p) => p.cost.total == null) };
+}
+
+/** Schemat som det visas, i den form det sparas: en rad per ledig dag med de valda förslagen. */
+export function scheduleToSaved(schedule: Schedule): SavedDay[] {
+  return schedule.days.map((d) => ({ date: d.date, itemIds: d.chosen.map((c) => c.item.id) }));
 }
 
 /** Nyckeln som förslag och betyg grupperas på: staden, eller platsen för en sökning var som helst. */
