@@ -20,7 +20,12 @@ const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const optNum = (v: unknown) => v === undefined || v === null || isNum(v);
-const isIsoDate = (v: unknown): v is string => isStr(v) && ISO_DATE.test(v) && !Number.isNaN(Date.parse(v));
+// Date.parse godtar "2026-02-30" (blir 2 mars), så datumet måste överleva en tur och retur.
+const isIsoDate = (v: unknown): v is string => {
+  if (!isStr(v) || !ISO_DATE.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;
+};
 const oneOf = <T extends string>(list: readonly T[], v: unknown): v is T => isStr(v) && (list as readonly string[]).includes(v);
 
 const validTime = (v: unknown): v is string => isStr(v) && HHMM.test(v) && Number(v.split(":")[0]) < 24 && Number(v.split(":")[1]) < 60;
@@ -65,7 +70,8 @@ function checkItem(it: unknown, i: number, errors: string[]): void {
       if (b.required !== undefined && b.required !== null && !oneOf(YES_NO, b.required)) errors.push(`${at}.booking.required måste vara ja, nej eller oklart`);
       if (b.opensAt !== undefined && b.opensAt !== null && !(isStr(b.opensAt) && BOOKING_OPENS.test(b.opensAt) && isIsoDate(b.opensAt.slice(0, 10)) && (b.opensAt.length === 10 || validTime(b.opensAt.slice(11))))) errors.push(`${at}.booking.opensAt måste vara YYYY-MM-DD eller YYYY-MM-DDTHH:MM`);
       if (b.url !== undefined && b.url !== null && !safeUrl(b.url)) errors.push(`${at}.booking.url måste vara en http(s)-adress`);
-      if (b.note !== undefined && !(isStr(b.note) && b.note.length <= 300)) errors.push(`${at}.booking.note måste vara text, högst 300 tecken`);
+      // En lång anteckning kortas vid visning. Den får inte fälla en hel körning.
+      if (b.note !== undefined && b.note !== null && !isStr(b.note)) errors.push(`${at}.booking.note måste vara text eller null`);
     }
   }
   if (it.sources !== undefined) {
