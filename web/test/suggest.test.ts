@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dayPlanFor, rankedSuggestions, runKey, scheduleFor, scheduleToSaved, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
+import { dayPlanFor, mergeSavedDays, rankedSuggestions, runKey, scheduleFor, scheduleToSaved, suggestionsByDay, type RunView } from "../src/lib/suggest.ts";
 
 const profile = { adults: 2, children: [{ birthdate: "2026-01-27" }], availability: { weekdays: true, weekends: false } };
 const city = { id: "stockholm", name: "Stockholm", transport: { car: true, transit: true }, maxTravelMin: 45, carCostPerKm: 2.5, transitTicket: { adult: 43 }, childFreeTransitUnder: 12 };
@@ -184,4 +184,19 @@ test("eget schema: familjens val gäller för sina dagar, resten är automatiskt
   assert.equal(sch.weeks[0]?.total, sum);
   const round = scheduleFor(run, profile, city, null, [], 2, scheduleToSaved(sch));
   assert.deepEqual(scheduleToSaved(round), scheduleToSaved(sch), "det som sparas ger samma schema tillbaka");
+});
+
+test("eget schema: val som försvunnit ur körningen räknas, och passerade sparade dagar behålls vid ny sparning", () => {
+  const sch = scheduleFor(run, profile, city, null, [], 2, [{ date: "2026-11-12", itemIds: ["far", "borta"] }, { date: "2026-11-13", itemIds: ["borta"] }, { date: "2026-11-11", itemIds: [] }]);
+  const day = (date: string) => sch.days.find((d) => d.date === date);
+  assert.equal(day("2026-11-12")?.dropped, 1);
+  assert.equal(day("2026-11-13")?.dropped, 1, "en dag som blev tom för att valet försvann är inte en vald vilodag");
+  assert.deepEqual(day("2026-11-13")?.chosen, []);
+  assert.equal(day("2026-11-11")?.dropped, 0, "en vald vilodag har inget som försvunnit");
+  assert.equal(day("2026-11-10")?.dropped, 0);
+  const stored = [{ date: "2026-11-09", itemIds: ["near"] }, { date: "2026-11-10", itemIds: ["far"] }, { date: "2026-11-12", itemIds: ["far"] }];
+  const incoming = [{ date: "2026-11-12", itemIds: [] }, { date: "2026-11-11", itemIds: ["near"] }];
+  assert.deepEqual(mergeSavedDays(stored, incoming, "2026-11-11"), [{ date: "2026-11-09", itemIds: ["near"] }, { date: "2026-11-10", itemIds: ["far"] }, { date: "2026-11-11", itemIds: ["near"] }, { date: "2026-11-12", itemIds: [] }], "passerade dagar behålls, dagens och kommande ersätts");
+  assert.deepEqual(mergeSavedDays(stored, [{ date: "2026-11-13", itemIds: [] }], "2026-11-11").map((d) => d.date), ["2026-11-09", "2026-11-10", "2026-11-13"], "en kommande dag som inte skickas med tas bort");
+  assert.deepEqual(mergeSavedDays(null, incoming, "2026-11-11").map((d) => d.date), ["2026-11-11", "2026-11-12"]);
 });

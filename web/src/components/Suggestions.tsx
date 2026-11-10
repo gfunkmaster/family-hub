@@ -192,7 +192,10 @@ function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { sched
     const res = await saveSchedule(runId, scheduleToSaved(schedule));
     if (res.ok) { setErrors([]); onChange(null); } else setErrors(res.errors);
   });
-  const reset = () => start(async () => { await clearSchedule(runId); setErrors([]); onChange(null); });
+  const reset = () => start(async () => {
+    try { await clearSchedule(runId); setErrors([]); onChange(null); } catch { setErrors(["Schemat kunde inte tas bort just nu. Försök igen."]); }
+  });
+  const droppedTotal = schedule.days.reduce((n, d) => n + d.dropped, 0);
   return (
     <section className="schedule" aria-label="Schema">
       <p className="meta">
@@ -206,6 +209,7 @@ function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { sched
           <li key={w.from}>v. {w.week}: {kr(w.total)}{w.budget != null ? ` av ${kr(w.budget)}${w.total > w.budget ? " (över veckobudgeten)" : ""}` : ""}{w.unknownCost ? ", plus okända priser" : ""}</li>
         ))}</ul>
       ) : null}
+      {droppedTotal ? <p className="flag" role="status"><b>Sökningen har ändrats sedan ni sparade.</b> {droppedTotal} av era val finns inte längre kvar och visas inte. Välj nya och spara, eller ta bort schemat för att se förslaget igen.</p> : null}
       {past ? null : (
         <div className="row">
           <button className={dirty || !saved ? "primary small" : "small"} disabled={pending || (saved && !dirty)} onClick={save}>{pending ? "Sparar…" : saved && !dirty ? "Schemat är sparat" : "Spara schemat"}</button>
@@ -241,7 +245,7 @@ function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { sched
                   </div>
                 );
               })}
-              {!d.chosen.length ? <p className="meta">{d.overBudget ? "Veckobudgeten är slut: inget av dagens förslag ryms. En vilodag, eller höj budgeten under Familj." : d.own ? "Vilodag." : "Inget förslag den här dagen. En vilodag."}</p> : null}
+              {!d.chosen.length ? <p className="meta">{d.overBudget ? "Veckobudgeten är slut: inget av dagens förslag ryms. En vilodag, eller höj budgeten under Familj." : d.dropped ? "Det ni valde finns inte längre i sökningen." : d.own ? "Vilodag." : "Inget förslag den här dagen. En vilodag."}</p> : null}
               {d.why.length ? <p className="meta">{d.why.join(". ")}.</p> : null}
               {!past && d.options.length ? (
                 <div className="row" role="group" aria-label={`Lägg till på ${p.weekday}`}>

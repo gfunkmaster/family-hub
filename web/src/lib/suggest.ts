@@ -110,6 +110,8 @@ export interface ScheduleDay {
   options: Suggestion[];
   /** Dagen kommer från familjens eget schema (sparat eller under redigering). */
   own: boolean;
+  /** Antal val i det egna schemat som inte längre finns i körningen den dagen (t.ex. efter en ny sökning). */
+  dropped: number;
   why: string[]; overBudget: boolean;
 }
 /** Summan för en vecka (måndag–söndag) i schemat. `budget` är profilens veckobudget, eller null utan gräns. */
@@ -145,8 +147,9 @@ export function scheduleFor(run: RunView, profile: Profile, city: City, origin: 
     const chosen = mine
       ? mine.itemIds.flatMap((id) => { const it = run.items.find((i) => i.id === id); return it && onDay(it, x.date) ? [sug(it, x.date)] : []; })
       : pick ? [pick] : [];
+    const dropped = mine ? mine.itemIds.length - chosen.length : 0;
     const options = run.items.filter((it) => dayEntry(it, x.date) && !chosen.some((c) => c.item.id === it.id)).map((it) => sug(it, x.date)).filter((s) => s.score > -3).sort((a, b) => b.score - a.score).slice(0, 6);
-    return { date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick, alts: x.alts.map((a) => sug(a, x.date)), chosen, options, own: !!mine, why: mine ? [] : x.why, overBudget: !mine && x.overBudget };
+    return { date: x.date, weather: run.weather.find((w) => w.date === x.date) ?? null, pick, alts: x.alts.map((a) => sug(a, x.date)), chosen, options, own: !!mine, dropped, why: mine ? [] : x.why, overBudget: !mine && x.overBudget };
   });
   const weeks: ScheduleWeek[] = [];
   for (const d of days) {
@@ -157,6 +160,15 @@ export function scheduleFor(run: RunView, profile: Profile, city: City, origin: 
   }
   const all = days.flatMap((d) => d.chosen);
   return { days, weeks, freeDays: free.length, total: all.reduce((n, p) => n + (p.cost.total ?? 0), 0), unknownCost: all.some((p) => p.cost.total == null) };
+}
+
+/**
+ * Det som ska sparas när familjen sparar schemat: de nya dagarna, plus redan sparade dagar som har passerat
+ * och inte finns med i det nya. Passerade dagar visas inte längre på sidan, så de får inte försvinna vid en ny sparning.
+ */
+export function mergeSavedDays(existing: SavedDay[] | null | undefined, incoming: SavedDay[], today: string): SavedDay[] {
+  const kept = (existing ?? []).filter((d) => d.date < today && !incoming.some((n) => n.date === d.date));
+  return [...kept, ...incoming].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Schemat som det visas, i den form det sparas: en rad per ledig dag med de valda förslagen. */

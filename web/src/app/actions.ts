@@ -14,7 +14,7 @@ import { isValidId, parseCity, parseProfile, parseSchedule } from "@/lib/validat
 import type { Item } from "@family-hub/logic";
 import { runDirectSearch } from "@/lib/agent/runner";
 import { geocode } from "@/lib/geo/forward";
-import { runKey } from "@/lib/suggest";
+import { mergeSavedDays, runKey, stockholmToday, type SavedDay } from "@/lib/suggest";
 
 async function requireFamily(): Promise<void> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -155,11 +155,13 @@ export async function saveProfile(input: unknown): Promise<{ ok: true } | { ok: 
 export async function saveSchedule(runId: string, days: unknown): Promise<{ ok: true } | { ok: false; errors: string[] }> {
   await requireFamily();
   if (!isValidId(runId)) return { ok: false, errors: ["Ogiltig sökning."] };
-  const run = await db().run.findUnique({ where: { id: runId }, select: { dates: true, items: true } });
+  const run = await db().run.findUnique({ where: { id: runId }, select: { dates: true, items: true, schedule: { select: { days: true } } } });
   if (!run) return { ok: false, errors: ["Sökningen finns inte längre."] };
   const parsed = parseSchedule(days, { dates: run.dates, items: run.items as unknown as Item[] });
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
-  const data = parsed.value as unknown as Prisma.InputJsonValue;
+  // Sidan visar och skickar bara dagar från idag och framåt. Redan sparade, passerade dagar behålls.
+  const merged = mergeSavedDays(run.schedule?.days as SavedDay[] | undefined, parsed.value, stockholmToday(new Date()));
+  const data = merged as unknown as Prisma.InputJsonValue;
   await db().savedSchedule.upsert({ where: { runId }, create: { runId, days: data }, update: { days: data } });
   revalidatePath("/");
   return { ok: true };
