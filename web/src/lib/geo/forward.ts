@@ -13,10 +13,17 @@ const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object
 const str = (x: unknown): string => (typeof x === "string" ? x.trim() : "");
 const norm = (t: string) => t.toLowerCase().normalize("NFC");
 
-/** Orten för en träff: tätort eller kommun. */
+/** Orten för en träff: tätort, annars kommunen utan "kommun" ("Växjö kommun" → "Växjö"). */
 function townOf(hit: Record<string, unknown>): string {
   const a = isObj(hit.address) ? hit.address : {};
-  return str(a.city) || str(a.town) || str(a.village) || str(a.municipality);
+  return str(a.city) || str(a.town) || str(a.village) || str(a.municipality).replace(/s? kommun$/i, "");
+}
+
+/** Nämner frågan orten som ett eget ord? "Lundavägen 5" nämner inte Lund, "Storgatan 3, Lund" gör det. */
+export function namesTown(query: string, town: string): boolean {
+  const words = (t: string) => norm(t).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const q = words(query), t = words(town);
+  return t.length > 0 && q.some((_, i) => t.every((w, j) => q[i + j] === w));
 }
 
 function toHit(first: Record<string, unknown>): GeoHit | null {
@@ -30,8 +37,8 @@ function toHit(first: Record<string, unknown>): GeoHit | null {
 
 /**
  * Bästa träffen i Nominatims svar. Skräp, tom lista eller koordinater utanför jorden ger ingen träff.
- * Ligger träffarna i flera orter måste frågan själv nämna den första träffens ort ("Storgatan 3, Växjö"),
- * annars är den tvetydig ("Storgatan 3", "Centrum") och ingen träff väljs.
+ * Ligger träffarna i flera orter måste frågan själv nämna den första träffens ort som ett eget ord
+ * ("Storgatan 3, Växjö"), annars är den tvetydig ("Storgatan 3", "Centrum", "Lundavägen 5") och ingen träff väljs.
  */
 export function parseSearch(json: unknown, query = ""): GeoResult {
   const hits = Array.isArray(json) ? json.filter(isObj) : [];
@@ -39,8 +46,9 @@ export function parseSearch(json: unknown, query = ""): GeoResult {
   const hit = first ? toHit(first) : null;
   if (!first || !hit) return { hit: null, ambiguous: false };
   const towns = new Set(hits.map(townOf).filter(Boolean).map(norm));
-  const town = norm(townOf(first));
-  if (towns.size > 1 && !(town && norm(query).includes(town))) return { hit: null, ambiguous: true };
+  // En träff utan ort kan inte kontrolleras mot frågan, och räknas därför som en egen ort.
+  const unknownTown = hits.some((h) => !townOf(h));
+  if ((towns.size > 1 || (unknownTown && hits.length > 1)) && !namesTown(query, townOf(first))) return { hit: null, ambiguous: true };
   return { hit, ambiguous: false };
 }
 
