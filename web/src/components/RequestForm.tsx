@@ -86,6 +86,13 @@ export function RequestForm({ cities, budget }: { cities: { id: string; name: st
         <button type="submit" name="mode" value="kö" disabled={pending}>Lägg i kön</button>
         {state?.error ? <span className="error" role="alert">{state.error}</span> : null}
         {state?.ok ? <span className="chip good" role="status">{state.direct ? "Sökningen har startat" : "Beställningen ligger i kön"}</span> : null}
+        {state?.ok && state.located ? (
+          <span className="meta" role="status">
+            {state.located.status === "ok" ? `Utgår från ${state.located.label}.`
+              : state.located.status === "failed" ? "Karttjänsten svarade inte, så adressen fick inga koordinater. Sökningen får själv ta reda på var det är."
+                : "Adressen hittades inte på kartan. Sökningen får själv ta reda på var det är."}
+          </span>
+        ) : null}
       </div>
       <p className="meta" style={{ gridColumn: "1/-1" }}>
         {!budget.configured ? "Sök nu kräver en API-nyckel (ANTHROPIC_API_KEY). Kön tas av torsdagskörningen kl 18.48."

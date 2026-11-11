@@ -226,6 +226,8 @@ export function parseProfile(body: unknown): Result<Profile> {
   if (b.adults !== undefined && !(isNum(b.adults) && Number.isInteger(b.adults) && b.adults >= 1 && b.adults <= 6)) errors.push("adults måste vara 1–6");
   if (!optNum(b.budgetMax) || (isNum(b.budgetMax) && (b.budgetMax < 0 || b.budgetMax > 100000))) errors.push("budgetMax måste vara 0–100 000 kr eller tomt");
 
+  if (!optNum(b.weekBudget) || (isNum(b.weekBudget) && (b.weekBudget < 0 || b.weekBudget > 100000))) errors.push("weekBudget måste vara 0–100 000 kr eller tomt");
+
   const children: NonNullable<Profile["children"]> = [];
   if (b.children !== undefined) {
     if (!Array.isArray(b.children) || b.children.length > 8) errors.push("children måste vara en lista med högst 8 barn");
@@ -289,6 +291,7 @@ export function parseProfile(body: unknown): Result<Profile> {
     value: {
       adults: isNum(b.adults) ? b.adults : 2,
       budgetMax: isNum(b.budgetMax) ? b.budgetMax : null,
+      weekBudget: isNum(b.weekBudget) ? b.weekBudget : null,
       children, naps, places, interests, avoid,
       needs: { stroller: needs.stroller === true, changing: needs.changing === true },
       availability: { weekdays: avail.weekdays === true, weekends: avail.weekends !== false },
@@ -402,4 +405,35 @@ export function parseRequest(body: unknown): Result<RequestInput> {
       createdAt: isStr(body.createdAt) && !Number.isNaN(Date.parse(body.createdAt)) ? body.createdAt : new Date().toISOString(),
     },
   };
+}
+
+export interface SavedDayInput { date: string; itemIds: string[] }
+export const MAX_ITEMS_PER_DAY = 4;
+
+/**
+ * Ett sparat schema: [{date, itemIds}]. Varje dag måste finnas i körningen och varje förslag i körningen den dagen
+ * (eller sakna datum, som en park). Högst fyra förslag per dag, som dagsplanen. En tom lista är en vald vilodag.
+ */
+export function parseSchedule(body: unknown, run: { dates: string[]; items: Pick<Item, "id" | "dates">[] }): Result<SavedDayInput[]> {
+  if (!Array.isArray(body)) return { ok: false, errors: ["Schemat måste vara en lista med dagar"] };
+  if (body.length > 62) return { ok: false, errors: ["Schemat får ha högst 62 dagar"] };
+  const errors: string[] = [], out: SavedDayInput[] = [], seen = new Set<string>();
+  body.forEach((d, i) => {
+    const at = `days[${i}]`;
+    if (!isObj(d) || !isIsoDate(d.date)) { errors.push(`${at}.date måste vara YYYY-MM-DD`); return; }
+    const date = d.date;
+    if (!run.dates.includes(date)) { errors.push(`${at}.date ${date} finns inte i sökningens period`); return; }
+    if (seen.has(date)) { errors.push(`${at}.date ${date} förekommer två gånger`); return; }
+    seen.add(date);
+    if (!Array.isArray(d.itemIds) || !d.itemIds.every(isStr)) { errors.push(`${at}.itemIds måste vara en lista med id`); return; }
+    if (d.itemIds.length > MAX_ITEMS_PER_DAY) { errors.push(`${at}: högst ${MAX_ITEMS_PER_DAY} förslag per dag`); return; }
+    if (new Set(d.itemIds).size !== d.itemIds.length) { errors.push(`${at}: samma förslag två gånger`); return; }
+    for (const id of d.itemIds) {
+      const it = run.items.find((x) => x.id === id);
+      if (!it) errors.push(`${at}: förslaget ${id.slice(0, 60)} finns inte i sökningen`);
+      else if (it.dates?.length && !it.dates.some((x) => x.date === date)) errors.push(`${at}: ${id.slice(0, 60)} finns inte den ${date}`);
+    }
+    out.push({ date, itemIds: d.itemIds });
+  });
+  return errors.length ? { ok: false, errors } : { ok: true, value: out.sort((a, b) => a.date.localeCompare(b.date)) };
 }

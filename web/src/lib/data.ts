@@ -2,7 +2,7 @@ import "server-only";
 import { type City, type FoodSpot, type Item, type Origin, type PackedFood, type Profile } from "@family-hub/logic";
 import { db } from "@/lib/db";
 import { reapStaleRequests } from "@/lib/agent/runner";
-import { runKey, type PlaceView, type RunView, type StoredRating, type Weather } from "@/lib/suggest";
+import { runKey, type PlaceView, type RunView, type SavedDay, type StoredRating, type Weather } from "@/lib/suggest";
 import type { Run } from "@/generated/prisma/client";
 
 // JSON-kolumnerna valideras när de skrivs (lib/validate.ts) och kan därför läsas som sina typer.
@@ -17,7 +17,7 @@ export async function getCities(): Promise<(City & { id: string; name: string })
   return rows.map((r) => ({ ...(r.data as City), id: r.id, name: r.name }));
 }
 
-function toRunView(r: Run, cityNames: Map<string, string>): RunView {
+function toRunView(r: Run & { schedule?: { days: unknown } | null }, cityNames: Map<string, string>): RunView {
   const place = (r.place as PlaceView | null) ?? null;
   const key = runKey(r.cityId, place, r.id);
   return {
@@ -28,6 +28,8 @@ function toRunView(r: Run, cityNames: Map<string, string>): RunView {
     food: (r.food as unknown as FoodSpot[] | null) ?? [], packed: (r.packed as unknown as PackedFood[] | null) ?? [],
     fetched: (r.fetched as unknown as RunView["fetched"] | null) ?? [],
     origin: (r.origin as Origin | null) ?? null,
+    // Valideras när det sparas (parseSchedule).
+    schedule: (r.schedule?.days as SavedDay[] | undefined) ?? null,
   };
 }
 
@@ -37,12 +39,12 @@ async function cityNames(): Promise<Map<string, string>> {
 
 /** De senaste körningarna, nyast först. Vilken som visas per plats avgörs av `pickRunPerPlace`. */
 export async function getRecentRuns(): Promise<RunView[]> {
-  const [rows, names] = await Promise.all([db().run.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), cityNames()]);
+  const [rows, names] = await Promise.all([db().run.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { schedule: true } }), cityNames()]);
   return rows.map((r) => toRunView(r, names));
 }
 
 export async function getRun(id: string): Promise<RunView | null> {
-  const [r, names] = await Promise.all([db().run.findUnique({ where: { id } }), cityNames()]);
+  const [r, names] = await Promise.all([db().run.findUnique({ where: { id }, include: { schedule: true } }), cityNames()]);
   return r ? toRunView(r, names) : null;
 }
 

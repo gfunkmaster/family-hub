@@ -310,3 +310,92 @@ test("förbokning: krävs, öppnar senare, oklart och drop-in", () => {
   assert.equal(st({ required: "oklart", opensAt: "", url: "", note: "" }), null, "tom text är okänt");
   assert.deepEqual([st({ required: "ja", opensAt: "2026-11-12T09:00:00" }).opensDate, st({ required: "ja", opensAt: "2026-11-12T09:00:00" }).opensTime], ["2026-11-12", "09:00"]);
 });
+
+test("schema: inomhus går före när regn väntas, och okänt väder ändrar inget", () => {
+  const days = ["2026-11-10", "2026-11-11"];
+  const on = (ds) => ds.map((date) => ({ date, from: "10:00", to: "16:00" }));
+  const park = { id: "park", title: "Park", indoor: false, dates: on(days), _s: 3 };
+  const museum = { id: "museum", title: "Museum", indoor: true, dates: on(days), _s: 2 };
+  const unknown = { id: "torg", title: "Torg", dates: on(days), _s: 1 };
+  const score = (it) => it._s;
+  assert.equal(L.isRainy({ date: "x", precipMm: 1 }), true);
+  assert.equal(L.isRainy({ date: "x", precip: 50 }), true);
+  assert.equal(L.isRainy({ date: "x", precipMm: 0.4, precip: 30 }), false);
+  assert.equal(L.isRainy({ date: "x" }), false, "okänt är inte regn");
+  assert.equal(L.isRainy(null), false);
+  const dry = L.schedulePeriod([park, museum, unknown], days, score, { gap: 0 });
+  assert.deepEqual(dry.map((d) => d.pick.id), ["park", "park"]);
+  const wet = L.schedulePeriod([park, museum, unknown], days, score, { gap: 0, weather: [{ date: "2026-11-10", precipMm: 4 }, { date: "2026-11-11", precipMm: 0 }] });
+  assert.deepEqual(wet.map((d) => d.pick.id), ["museum", "park"]);
+  assert.deepEqual(wet[0].why, ["Inomhus: regn väntas"]);
+  assert.deepEqual(wet[1].why, []);
+  const onlyOutdoor = L.schedulePeriod([park], ["2026-11-10"], score, { weather: [{ date: "2026-11-10", precip: 80 }] });
+  assert.equal(onlyOutdoor[0].pick.id, "park", "regn tar inte bort dagens enda förslag");
+  assert.match(onlyOutdoor[0].why[0], /Utomhus trots regn: inget annat passade/);
+  // Ett utomhusförslag med mycket högre poäng går ändå inte före när något annat passar: skälet som visas ska vara sant.
+  const strong = L.schedulePeriod([{ ...park, _s: 9 }, museum], ["2026-11-10"], score, { weather: [{ date: "2026-11-10", precipMm: 5 }] });
+  assert.equal(strong[0].pick.id, "museum");
+  assert.deepEqual(strong[0].alts.map((a) => a.id), ["park"]);
+  const vsUnknown = L.schedulePeriod([{ ...park, _s: 9 }, unknown], ["2026-11-10"], score, { weather: [{ date: "2026-11-10", precipMm: 5 }] });
+  assert.equal(vsUnknown[0].pick.id, "torg", "okänt inne/ute räknas inte som utomhus");
+  assert.deepEqual(vsUnknown[0].why, []);
+  const unfit = { id: "nej", title: "Passar ej", indoor: true, dates: on(days), _s: -6 };
+  assert.equal(L.schedulePeriod([unfit], ["2026-11-10"], score, { weather: [{ date: "2026-11-10", precipMm: 9 }] })[0].pick, null, "regn lyfter inte in något som inte passar åldern");
+});
+
+test("schema: veckobudgeten håller per vecka, och okända priser räknas inte", () => {
+  // Måndag 9 nov – måndag 16 nov: två olika veckor.
+  const days = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-16"];
+  const on = days.map((date) => ({ date, from: "10:00", to: "16:00" }));
+  const dyr = { id: "dyr", title: "Dyr", dates: on, _s: 5, _c: 300 };
+  const billig = { id: "billig", title: "Billig", dates: on, _s: 3, _c: 100 };
+  const okand = { id: "okand", title: "Okänt pris", dates: on, _s: 1, _c: null };
+  const opts = { gap: 0, costFn: (it) => it._c, weekBudget: 450 };
+  const sch = L.schedulePeriod([dyr, billig, okand], days, (it) => it._s, opts);
+  assert.deepEqual(sch.map((d) => d.pick.id), ["dyr", "billig", "okand", "dyr"], "300 + 100 ryms, sedan bara okänt pris; ny vecka börjar om");
+  assert.deepEqual(sch[1].why, ["Valt för att rymmas i veckobudgeten"]);
+  assert.equal(sch[0].overBudget, false);
+  const tight = L.schedulePeriod([dyr, billig], days.slice(0, 3), (it) => it._s, { ...opts, weekBudget: 350 });
+  assert.deepEqual(tight.map((d) => d.pick?.id ?? null), ["dyr", null, null]);
+  assert.deepEqual(tight.map((d) => d.overBudget), [false, true, true]);
+  assert.deepEqual(tight[1].alts, [], "alternativen ryms inte heller");
+  const none = L.schedulePeriod([dyr, billig], days.slice(0, 3), (it) => it._s, { gap: 0, costFn: (it) => it._c });
+  assert.deepEqual(none.map((d) => d.pick.id), ["dyr", "dyr", "dyr"], "utan budget ändras inget");
+  assert.equal(L.weekStart("2026-11-15"), "2026-11-09", "söndag hör till veckan som började på måndagen");
+  assert.equal(L.weekStart("2026-11-16"), "2026-11-16");
+});
+
+test("schema: ett återkommande pass hålls på sin veckodag", () => {
+  const tisdagar = ["2026-11-10", "2026-11-17"], alla = ["2026-11-10", "2026-11-13", "2026-11-17"];
+  const sang = { id: "sang", title: "Babysång", dates: alla.map((date) => ({ date, from: "10:00", to: "11:00" })), _s: 2 };
+  const lek = { id: "lek", title: "Öppna förskolan", dates: alla.map((date) => ({ date, from: "09:00", to: "12:00" })), _s: 3 };
+  const first = { "2026-11-10": { sang: 4, lek: 3 } };
+  const sch = L.schedulePeriod([sang, lek], alla, (it, d) => first[d]?.[it.id] ?? it._s, { gap: 0 });
+  assert.deepEqual(sch.map((d) => d.pick.id), ["sang", "lek", "sang"], "babysång vinner tisdagen igen trots lägre grundpoäng");
+  assert.deepEqual(sch[2].why, ["Samma veckodag som förra gången"]);
+  assert.ok(tisdagar.every((d) => sch.find((x) => x.date === d).pick.id === "sang"));
+});
+
+test("dagsplan: resan mellan två aktiviteter räknas från den förra, och resan hem läggs sist", () => {
+  const ev = (id, from, to, extra) => ({ id, title: id, kind: "event", durationMin: 60, dates: [{ date: "2026-11-13", from, to }], ...extra });
+  const a = ev("A", "10:00", "11:00", { _travelMin: 30, _travelNote: "bil" });
+  const b = ev("B", "13:00", "14:00", { _travelMin: 40, _travelNote: "bil" });
+  const between = (from, to) => (from.id === "A" && to.id === "B" ? { min: 10, note: "promenad från A" } : null);
+  const plan = L.autoPlan([a, b], { naps: [] }, "2026-11-13", { travelBetween: between, homeTrip: true });
+  const trips = plan.filter((x) => x.kind === "resa").map((x) => [x.time, x.endTime, x.title, x.note]);
+  assert.deepEqual(trips, [["09:30", "10:00", "Resa", "bil"], ["12:50", "13:00", "Resa", "promenad från A"], ["14:00", "14:40", "Resa tillbaka", "bil"]]);
+  const old = L.autoPlan([a, b], { naps: [] }, "2026-11-13");
+  assert.deepEqual(old.filter((x) => x.kind === "resa").map((x) => [x.time, x.title]), [["09:30", "Resa"], ["12:20", "Resa"]], "utan valen räknas allt hemifrån, som förut");
+  const unknown = L.autoPlan([a, b], { naps: [] }, "2026-11-13", { travelBetween: () => null });
+  assert.equal(unknown.filter((x) => x.kind === "resa")[1].time, "12:20", "okänd sträcka mellan aktiviteterna faller tillbaka på restiden hemifrån");
+  const noTravel = L.autoPlan([ev("C", "10:00", "11:00", {})], { naps: [] }, "2026-11-13", { homeTrip: true });
+  assert.equal(noTravel.some((x) => x.title === "Resa tillbaka"), false, "okänd restid ger ingen påhittad resa tillbaka");
+  // En tupplur som börjar under resan tillbaka får inte försvinna.
+  const mid = { id: "M", title: "M", kind: "event", durationMin: 60, dates: [{ date: "2026-11-13", from: "11:50", to: "12:50" }], _travelMin: 20 };
+  const nap = { naps: [{ from: "13:00", to: "14:30" }] };
+  const without = L.autoPlan([mid], nap, "2026-11-13").filter((x) => x.kind === "vila").map((x) => [x.time, x.endTime]);
+  const withBack = L.autoPlan([mid], nap, "2026-11-13", { homeTrip: true });
+  assert.deepEqual(without, [["13:00", "14:30"]]);
+  assert.deepEqual(withBack.filter((x) => x.kind === "vila").map((x) => [x.time, x.endTime]), [["13:10", "14:30"]], "tuppluren börjar när resan är slut");
+  assert.deepEqual(withBack.filter((x) => x.title === "Resa tillbaka").map((x) => [x.time, x.endTime]), [["12:50", "13:10"]]);
+});

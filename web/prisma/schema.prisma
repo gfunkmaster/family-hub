@@ -48,8 +48,18 @@ model Run {
   fetched   Json     @default("[]")
   createdAt DateTime
   updatedAt DateTime @updatedAt
+  schedule  SavedSchedule?
 
   @@index([cityId, createdAt])
+}
+
+/// Familjens sparade schema för en körning: [{date, itemIds}] med upp till fyra förslag per dag.
+/// Ett per körning. En dag med tom lista är en vald vilodag.
+model SavedSchedule {
+  runId     String   @id
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  days      Json
+  updatedAt DateTime @updatedAt
 }
 
 /// En beställning. `mode` är "direkt" (sidan söker via Claude API) eller "kö" (torsdagskörningen).

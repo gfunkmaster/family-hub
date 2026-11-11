@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { readableName, walkingBeatsTransit, type TripSummary } from "@/lib/travel/resrobot";
 import { ageMonths, bookingStatus, clothingFor, fmtPrecip, haversineKm, hasCoords, parseDate, safeUrl, svNum, TIER_LABEL, type City, type Item, type Origin, type Profile, type Tier, type Weather } from "@family-hub/logic";
-import { rate } from "@/app/actions";
+import { clearSchedule, rate, saveSchedule } from "@/app/actions";
 import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
-import { calendarUrl, mapsUrl } from "@/lib/links";
-import { cityFor, rankedSuggestions, runIsPast, scheduleFor, suggestionsByDay, withoutPastDays, type Filters, type PeriodRef, type RunView, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
+import { calendarUrl, itemCalendarEvent, mapsUrl } from "@/lib/links";
+import { hasIcsEvents, scheduleIcs } from "@/lib/ics";
+import { cityFor, rankedSuggestions, runIsPast, scheduleFor, scheduleToSaved, suggestionsByDay, withoutPastDays, type Filters, type PeriodRef, type RunView, type SavedDay, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
 
 type CityRow = City & { id: string; name: string };
@@ -28,6 +29,8 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
   const [view, setView] = useState<"dag" | "lista" | "schema">("dag");
   const [originChoice, setOriginChoice] = useState<string>("auto");
   const geo = useGeolocation();
+  // Osparade ändringar i schemat, per körning.
+  const [drafts, setDrafts] = useState<Record<string, SavedDay[]>>({});
 
   const fullRun = runs.find((r) => r.city === cityId) ?? runs[0];
   // Passerade dagar visas inte. En helt passerad körning visas som den är, med en notis.
@@ -54,7 +57,9 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
   const mode = longRun ? view : "lista";
   const list = mode === "lista" ? rankedSuggestions(run, profile, city, origin, ratings, filters) : [];
   const days = mode === "dag" ? suggestionsByDay(run, profile, city, origin, ratings, filters) : [];
-  const schedule = mode === "schema" ? scheduleFor(run, profile, city, origin, ratings) : null;
+  const draft = drafts[run.id];
+  const schedule = mode === "schema" ? scheduleFor(run, profile, city, origin, ratings, 2, draft ?? run.schedule ?? null) : null;
+  const setDraft = (days: SavedDay[] | null) => setDrafts((cur) => { const next = { ...cur }; if (days) next[run.id] = days; else delete next[run.id]; return next; });
 
   return (
     <section className="view on" aria-label="Förslag">
@@ -139,7 +144,7 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
         </div>
       ) : null}
 
-      {mode === "schema" && schedule ? <ScheduleView schedule={schedule} runId={run.id} past={past} /> : null}
+      {mode === "schema" && schedule ? <ScheduleView schedule={schedule} runId={run.id} past={past} dirty={!!draft} saved={!!run.schedule} onChange={setDraft} /> : null}
 
       {mode === "schema" ? null : mode === "dag"
         ? days.map((d) => {
@@ -162,20 +167,72 @@ export function Suggestions({ runs, allRuns, today, cities, profile, ratings }: 
   );
 }
 
-function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: string; past: boolean }) {
+const MAX_PER_DAY = 4;
+
+/** Kalenderutkast för ett förslag en viss dag. Ett evenemang får sina tider, en plats blir en heldagshändelse med öppettiderna. */
+function itemCalendarUrl(it: Item, date: string): string | null {
+  return calendarUrl(itemCalendarEvent(it, date));
+}
+
+/** Laddar ner hela schemat som en .ics-fil. Datum och Blob skapas först vid klicket. */
+function downloadIcs(schedule: Schedule, runId: string) {
+  const text = scheduleIcs(schedule.days, { runId, now: new Date() });
+  if (!text) return;
+  const url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `familjeschema-${schedule.days[0]?.date ?? "schema"}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { schedule: Schedule; runId: string; past: boolean; dirty: boolean; saved: boolean; onChange: (days: SavedDay[] | null) => void }) {
+  const [pending, start] = useTransition();
+  const [errors, setErrors] = useState<string[]>([]);
   if (!schedule.freeDays) {
     return <div className="card empty">Inga lediga dagar i perioden. Är du föräldraledig? Slå på vardagar under <Link href="/familj">Familj</Link>.</div>;
   }
-  const rest = schedule.days.filter((d) => !d.pick).length;
+  const rest = schedule.days.filter((d) => !d.chosen.length).length;
+  // En ändring fryser hela schemat som det visas, så att de andra dagarna inte räknas om under en.
+  const edit = (date: string, ids: string[]) => { setErrors([]); onChange(scheduleToSaved(schedule).map((d) => (d.date === date ? { date, itemIds: ids } : d))); };
+  const save = () => start(async () => {
+    try {
+      const res = await saveSchedule(runId, scheduleToSaved(schedule));
+      if (res.ok) { setErrors([]); onChange(null); } else setErrors(res.errors);
+    } catch { setErrors(["Schemat kunde inte sparas just nu. Försök igen."]); }
+  });
+  const reset = () => start(async () => {
+    try { await clearSchedule(runId); setErrors([]); onChange(null); } catch { setErrors(["Schemat kunde inte tas bort just nu. Försök igen."]); }
+  });
+  const droppedTotal = schedule.days.reduce((n, d) => n + d.dropped, 0);
   return (
     <section className="schedule" aria-label="Schema">
       <p className="meta">
-        En huvudaktivitet per ledig dag ({schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan.
+        {saved || dirty
+          ? `Ert eget schema${dirty ? ", med ändringar som inte är sparade" : ""}.`
+          : `En huvudaktivitet per ledig dag (${schedule.freeDays} dagar), samma sak aldrig två dagar i rad eller med bara en dag emellan. När regn väntas väljs utomhus bara om inget annat passar.`}
         {" "}Kostnad ca {kr(schedule.total)}{schedule.unknownCost ? " plus okända priser" : ""}{rest ? `, ${rest} vilodag${rest > 1 ? "ar" : ""}` : ""}.
       </p>
+      {schedule.weeks.length > 1 || schedule.weeks.some((w) => w.budget != null) ? (
+        <ul className="meta weeks">{schedule.weeks.map((w) => (
+          <li key={w.from}>v. {w.week}: {kr(w.total)}{w.budget != null ? ` av ${kr(w.budget)}${w.total > w.budget ? " (över veckobudgeten)" : ""}` : ""}{w.unknownCost ? ", plus okända priser" : ""}</li>
+        ))}</ul>
+      ) : null}
+      {droppedTotal ? <p className="flag" role="status"><b>Sökningen har ändrats sedan ni sparade.</b> {droppedTotal} av era val finns inte längre kvar och visas inte. Välj nya och spara, eller ta bort schemat för att se förslaget igen.</p> : null}
+      {past ? null : (
+        <div className="row">
+          <button className={dirty || !saved ? "primary small" : "small"} disabled={pending || (saved && !dirty)} onClick={save}>{pending ? "Sparar…" : saved && !dirty ? "Schemat är sparat" : "Spara schemat"}</button>
+          {dirty ? <button className="small" disabled={pending} onClick={() => { setErrors([]); onChange(null); }}>Ångra ändringar</button> : null}
+          {saved && !dirty ? <button className="small" disabled={pending} onClick={reset}>Ta bort mitt schema och visa förslaget igen</button> : null}
+          {saved && !dirty && hasIcsEvents(schedule.days) ? <button className="small" onClick={() => downloadIcs(schedule, runId)}>Ladda ner schemat (.ics)</button> : null}
+          {errors.length ? <span className="error" role="alert">{errors.join(" ")}</span> : null}
+        </div>
+      )}
       {schedule.days.map((d) => {
-        const p = dayParts(d.date), it = d.pick?.item;
-        const time = it?.dates?.find((x) => x.date === d.date)?.from;
+        const p = dayParts(d.date), ids = d.chosen.map((c) => c.item.id);
+        const full = ids.length >= MAX_PER_DAY;
         return (
           <div key={d.date} className="sday">
             <div className="dayhead small">
@@ -183,14 +240,36 @@ function ScheduleView({ schedule, runId, past }: { schedule: Schedule; runId: st
               <span className="wd">{p.weekday}<br />{p.month}</span>
               {d.weather ? <span className="wx">{svNum(Number(d.weather.high))}°{fmtPrecip(d.weather) ? `, ${fmtPrecip(d.weather)}` : ""}</span> : null}
             </div>
-            {d.pick && it ? (
-              <div className="spick">
-                <h3>{it.title}</h3>
-                <p className="meta">{[time, it.venue, d.pick.travel?.min != null ? `${MODE[d.pick.travel.mode] ?? ""}${d.pick.travel.estimated ? " ca" : ""} ${d.pick.travel.min} min` : null, d.pick.cost.total != null ? kr(d.pick.cost.total) : "pris okänt"].filter(Boolean).join(", ")}</p>
-                {d.alts.length ? <p className="meta">Annars: {d.alts.map((a) => a.item.title).join(", ")}</p> : null}
-                {past ? null : <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&item=${encodeURIComponent(it.id)}`}>Planera dagen</Link></div>}
-              </div>
-            ) : <p className="meta">Inget förslag den här dagen. En vilodag.</p>}
+            <div className="spick">
+              {d.chosen.map((c) => {
+                const it = c.item, time = it.dates?.find((x) => x.date === d.date)?.from;
+                const cal = past ? null : itemCalendarUrl(it, d.date);
+                return (
+                  <div key={it.id} className="schosen">
+                    <h3>{it.title}</h3>
+                    <p className="meta">{[time, it.venue, c.travel?.min != null ? `${MODE[c.travel.mode] ?? ""}${c.travel.estimated ? " ca" : ""} ${c.travel.min} min` : null, c.cost.total != null ? kr(c.cost.total) : "pris okänt"].filter(Boolean).join(", ")}</p>
+                    {past ? null : (
+                      <div className="row">
+                        <button className="small" disabled={pending} onClick={() => edit(d.date, ids.filter((x) => x !== it.id))} aria-label={`Ta bort ${it.title} från ${p.weekday}`}>Ta bort</button>
+                        {cal ? <a className="btn small" href={cal} target="_blank" rel="noopener noreferrer">Lägg i kalendern</a> : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {!d.chosen.length ? <p className="meta">{d.overBudget ? "Veckobudgeten är slut: inget av dagens förslag ryms. En vilodag, eller höj budgeten under Familj." : d.dropped ? "Det ni valde finns inte längre i sökningen." : d.own ? "Vilodag." : "Inget förslag den här dagen. En vilodag."}</p> : null}
+              {d.why.length ? <p className="meta">{d.why.join(". ")}.</p> : null}
+              {!past && d.options.length ? (
+                <div className="row" role="group" aria-label={`Lägg till på ${p.weekday}`}>
+                  <span className="meta">{d.chosen.length ? "Lägg till:" : "Välj:"}</span>
+                  {d.options.slice(0, 4).map((o) => (
+                    <button key={o.item.id} className="small" disabled={pending || full} onClick={() => edit(d.date, [...ids, o.item.id])}>{o.item.title}</button>
+                  ))}
+                  {full ? <span className="meta">Högst {MAX_PER_DAY} per dag.</span> : null}
+                </div>
+              ) : null}
+              {!past && ids.length ? <div className="row"><Link className="btn small" href={`/plan?run=${encodeURIComponent(runId)}&date=${d.date}&${ids.map((id) => `item=${encodeURIComponent(id)}`).join("&")}`}>Planera dagen{ids.length > 1 ? ` (${ids.length} aktiviteter)` : ""}</Link></div> : null}
+            </div>
           </div>
         );
       })}
@@ -283,14 +362,7 @@ function Card({ s, runId, date, from, area, today, past = false, compact = false
   const travelTxt = travel ? `${MODE[travel.mode] ?? ""}${travel.min != null ? `${travel.estimated ? " ca" : ""} ${travel.min} min` : ""}${travel.withinLimit === false ? " (över er gräns)" : ""}` : "Restid okänd";
   const costTxt = cost.total != null ? `Totalt ${kr(cost.total)}` : `Entré ${kr(cost.entry)}${cost.travel != null ? ` + resa ${kr(cost.travel)}` : ""}`;
   const map = mapsUrl(it, area);
-  const entry = it.dates?.find((d) => d.date === date);
-  // Ett evenemang får sina tider. En plats har öppettider, inte en besökstid, så den blir en heldagshändelse.
-  const cal = past ? null : calendarUrl({
-    title: it.title, date,
-    ...(it.kind === "event" && entry?.from ? { start: entry.from, end: entry.to, durationMin: it.durationMin } : {}),
-    location: it.venue,
-    details: [entry?.from && it.kind !== "event" ? `Öppet ${entry.from}–${entry.to ?? ""}` : null, it.note, it.sources?.[0]?.url].filter(Boolean).join("\n"),
-  });
+  const cal = past ? null : itemCalendarUrl(it, date);
   const booking = past ? null : bookingStatus(it, today);
   const opensTxt = booking?.opensDate ? `${dayName(booking.opensDate)}${booking.opensTime ? ` kl. ${booking.opensTime}` : ""}` : "";
   // Påminnelse i kalendern den dag bokningen öppnar.

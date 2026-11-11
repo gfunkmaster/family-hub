@@ -10,9 +10,11 @@ import { createSessionToken, passwordMatches, SESSION_COOKIE, SESSION_DAYS, veri
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { createLimiter } from "@/lib/ratelimit";
-import { isValidId, parseCity, parseProfile } from "@/lib/validate";
+import { isValidId, parseCity, parseProfile, parseSchedule } from "@/lib/validate";
+import type { Item } from "@family-hub/logic";
 import { runDirectSearch } from "@/lib/agent/runner";
-import { runKey } from "@/lib/suggest";
+import { geocode } from "@/lib/geo/forward";
+import { mergeSavedDays, runKey, stockholmToday, type SavedDay } from "@/lib/suggest";
 
 async function requireFamily(): Promise<void> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -64,7 +66,9 @@ export async function rate(input: { key: string; runId: string; itemId: string; 
   revalidatePath("/");
 }
 
-export type RequestState = { error?: string; ok?: boolean; direct?: boolean } | null;
+/** Hur det gick att hitta adressen på kartan: hittad (med vilken träff), ingen träff, eller karttjänsten svarade inte. */
+export type Located = { status: "ok"; label: string } | { status: "none" | "failed" };
+export type RequestState = { error?: string; ok?: boolean; direct?: boolean; located?: Located } | null;
 
 /** Sparar en beställning. "Sök nu" startar direktsökningen efter svaret, så sidan inte väntar på den. */
 export async function createRequest(_prev: RequestState, form: FormData): Promise<RequestState> {
@@ -88,6 +92,7 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   let cityId: string | null = null;
   let place: { name: string; address?: string; lat?: number; lng?: number } | null = null;
   let origin: { name: string; address?: string; lat?: number; lng?: number } | null = null;
+  let located: Located | undefined;
   if (where === "gps") {
     if (!hasGps) return { error: "Tryck på Använd där jag är nu först." };
     const address = String(form.get("address") ?? "").trim().slice(0, 120);
@@ -95,8 +100,15 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
     origin = { name: place.name, lat, lng };
   } else if (where === "plats") {
     if (!placeName) return { error: "Skriv en adress eller ort." };
-    place = { name: placeName, address: placeName };
-    origin = { name: placeName, address: placeName };
+    // Koordinater från servern, så att restid kan räknas direkt och sökningen får en exakt mittpunkt.
+    // En tvetydig adress stoppas här, innan något sparas eller en betald sökning startar. Ingen träff eller
+    // inget svar från karttjänsten: beställningen går vidare utan koordinater, och sökningen tar reda på platsen.
+    const geo = await geocode(placeName);
+    if (geo.ambiguous) return { error: `"${placeName}" finns på flera orter. Skriv orten också, t.ex. "${placeName}, Växjö".` };
+    const coords = geo.hit ? { lat: geo.hit.lat, lng: geo.hit.lng } : {};
+    place = { name: placeName, address: geo.hit?.label || placeName, ...coords };
+    origin = { name: placeName, address: geo.hit?.label || placeName, ...coords };
+    located = geo.hit ? { status: "ok", label: geo.hit.label || placeName } : { status: geo.failed ? "failed" : "none" };
   } else {
     if (!isValidId(city)) return { error: "Välj stad." };
     cityId = city;
@@ -107,7 +119,7 @@ export async function createRequest(_prev: RequestState, form: FormData): Promis
   });
   if (mode === "direkt") after(() => runDirectSearch(req.id));
   revalidatePath("/bestall");
-  return { ok: true, direct: mode === "direkt" };
+  return { ok: true, direct: mode === "direkt", ...(located ? { located } : {}) };
 }
 
 /** Sparar familjens profil från Familj-sidan. Samma kontroll som importen. */
@@ -137,4 +149,28 @@ export async function saveProfile(input: unknown): Promise<{ ok: true } | { ok: 
   await db().profile.upsert({ where: { id: 1 }, create: { id: 1, data }, update: { data } });
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Sparar familjens schema för en körning (ett per körning). Kontrolleras mot körningens dagar och förslag. */
+export async function saveSchedule(runId: string, days: unknown): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  await requireFamily();
+  if (!isValidId(runId)) return { ok: false, errors: ["Ogiltig sökning."] };
+  const run = await db().run.findUnique({ where: { id: runId }, select: { dates: true, items: true, schedule: { select: { days: true } } } });
+  if (!run) return { ok: false, errors: ["Sökningen finns inte längre."] };
+  const parsed = parseSchedule(days, { dates: run.dates, items: run.items as unknown as Item[] });
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+  // Sidan visar och skickar bara dagar från idag och framåt. Redan sparade, passerade dagar behålls.
+  const merged = mergeSavedDays(run.schedule?.days as SavedDay[] | undefined, parsed.value, stockholmToday(new Date()));
+  const data = merged as unknown as Prisma.InputJsonValue;
+  await db().savedSchedule.upsert({ where: { runId }, create: { runId, days: data }, update: { days: data } });
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Tar bort det sparade schemat, så att det automatiska förslaget visas igen. */
+export async function clearSchedule(runId: string): Promise<void> {
+  await requireFamily();
+  if (!isValidId(runId)) throw new Error("Ogiltig sökning");
+  await db().savedSchedule.deleteMany({ where: { runId } });
+  revalidatePath("/");
 }
