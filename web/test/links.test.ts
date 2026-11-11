@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calendarUrl, isClockTime, mapsUrl } from "../src/lib/links.ts";
+import { calendarUrl, eventSpan, isClockTime, itemCalendarEvent, mapsUrl } from "../src/lib/links.ts";
 
 test("kartlänk: koordinater går före adress", () => {
   assert.equal(mapsUrl({ lat: 59.3245, lng: 18.0912, venue: "Djurgårdsbrunnsvägen 24" }), "https://www.google.com/maps/search/?api=1&query=59.3245,18.0912");
@@ -40,6 +40,24 @@ test("kalender: saknat eller felaktigt slut ger längd eller två timmar, högst
   assert.equal(dates({ title: "x", date: "2026-11-14", start: "24:00" }), "20261114/20261115");
   assert.equal(dates({ title: "x", date: "2026-11-14", start: "fel" }), "20261114/20261115");
   assert.equal(calendarUrl({ title: "x", date: "14 nov" }), null);
+});
+
+test("eventSpan: timad, heldag, ogiltigt slut och 23:59-gräns", () => {
+  assert.deepEqual(eventSpan({ title: "x", date: "2026-11-13", start: "10:15", end: "11:45" }), { allDay: false, start: "20261113T101500", end: "20261113T114500" });
+  assert.deepEqual(eventSpan({ title: "x", date: "2026-11-30" }), { allDay: true, start: "20261130", end: "20261201" });
+  assert.equal(eventSpan({ title: "x", date: "2026-11-14", start: "10:00", end: "09:00" })?.end, "20261114T120000");
+  assert.equal(eventSpan({ title: "x", date: "2026-11-14", start: "23:00" })?.end, "20261114T235900");
+  assert.equal(eventSpan({ title: "x", date: "14 nov" }), null);
+});
+
+test("itemCalendarEvent: evenemang får tider, plats blir heldag med öppettider", () => {
+  const ev = itemCalendarEvent({ id: "e", title: "Rytmik", kind: "event", venue: "Kyrkan", durationMin: 30, dates: [{ date: "2026-11-13", from: "10:15" }] }, "2026-11-13");
+  assert.equal(ev.start, "10:15");
+  assert.equal(ev.durationMin, 30);
+  assert.equal(ev.location, "Kyrkan");
+  const pl = itemCalendarEvent({ id: "p", title: "Museet", kind: "place", dates: [{ date: "2026-11-13", from: "10:00", to: "17:00" }] }, "2026-11-13");
+  assert.equal(pl.start, undefined);
+  assert.equal(pl.details, "Öppet 10:00–17:00");
 });
 
 test("klockslag: 9:30 och 09:30 godtas, 24:00 och tomt inte", () => {

@@ -6,7 +6,8 @@ import { ageMonths, bookingStatus, clothingFor, fmtPrecip, haversineKm, hasCoord
 import { clearSchedule, rate, saveSchedule } from "@/app/actions";
 import { buildSourceReport } from "@/lib/sourceReport";
 import Link from "next/link";
-import { calendarUrl, mapsUrl } from "@/lib/links";
+import { calendarUrl, itemCalendarEvent, mapsUrl } from "@/lib/links";
+import { hasIcsEvents, scheduleIcs } from "@/lib/ics";
 import { cityFor, rankedSuggestions, runIsPast, scheduleFor, scheduleToSaved, suggestionsByDay, withoutPastDays, type Filters, type PeriodRef, type RunView, type SavedDay, type Schedule, type StoredRating, type Suggestion } from "@/lib/suggest";
 import { useGeolocation } from "@/components/useGeolocation";
 
@@ -170,13 +171,21 @@ const MAX_PER_DAY = 4;
 
 /** Kalenderutkast för ett förslag en viss dag. Ett evenemang får sina tider, en plats blir en heldagshändelse med öppettiderna. */
 function itemCalendarUrl(it: Item, date: string): string | null {
-  const entry = it.dates?.find((d) => d.date === date);
-  return calendarUrl({
-    title: it.title, date,
-    ...(it.kind === "event" && entry?.from ? { start: entry.from, end: entry.to, durationMin: it.durationMin } : {}),
-    location: it.venue,
-    details: [entry?.from && it.kind !== "event" ? `Öppet ${entry.from}–${entry.to ?? ""}` : null, it.note, it.sources?.[0]?.url].filter(Boolean).join("\n"),
-  });
+  return calendarUrl(itemCalendarEvent(it, date));
+}
+
+/** Laddar ner hela schemat som en .ics-fil. Datum och Blob skapas först vid klicket. */
+function downloadIcs(schedule: Schedule, runId: string) {
+  const text = scheduleIcs(schedule.days, { runId, now: new Date() });
+  if (!text) return;
+  const url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `familjeschema-${schedule.days[0]?.date ?? "schema"}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { schedule: Schedule; runId: string; past: boolean; dirty: boolean; saved: boolean; onChange: (days: SavedDay[] | null) => void }) {
@@ -217,6 +226,7 @@ function ScheduleView({ schedule, runId, past, dirty, saved, onChange }: { sched
           <button className={dirty || !saved ? "primary small" : "small"} disabled={pending || (saved && !dirty)} onClick={save}>{pending ? "Sparar…" : saved && !dirty ? "Schemat är sparat" : "Spara schemat"}</button>
           {dirty ? <button className="small" disabled={pending} onClick={() => { setErrors([]); onChange(null); }}>Ångra ändringar</button> : null}
           {saved && !dirty ? <button className="small" disabled={pending} onClick={reset}>Ta bort mitt schema och visa förslaget igen</button> : null}
+          {saved && !dirty && hasIcsEvents(schedule.days) ? <button className="small" onClick={() => downloadIcs(schedule, runId)}>Ladda ner schemat (.ics)</button> : null}
           {errors.length ? <span className="error" role="alert">{errors.join(" ")}</span> : null}
         </div>
       )}
